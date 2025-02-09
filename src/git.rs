@@ -36,6 +36,7 @@ pub trait Git {
     fn commit(&self, message: &str) -> Result<(), String>;
     fn status(&self) -> Result<String, String>;
     fn remote(&self) -> ();
+    fn push(&self) -> ();
 }
 
 use crate::command::CommandExecutor;
@@ -52,6 +53,10 @@ impl<'a> RealGit<'a> {
 }
 
 impl<'a> Git for RealGit<'a> {
+    fn push(&self) -> () {
+        let stdout = self.executor.run_command("git", "push");
+        println!("{}", stdout)
+    }
     fn remote(&self) {
         let url = self.executor
             .run_command("git", "remote get-url origin");

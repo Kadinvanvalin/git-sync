@@ -65,6 +65,7 @@ async fn main() {
         }
         Commands::Commit(message) => {
             git.commit(message.commit_message.join(" ").as_str()).expect("TODO: panic message");
+            git.push();
             println!("commit")
         }
         Commands::Remote => {
