@@ -86,7 +86,9 @@ impl<'a> Git for RealGit<'a> {
 
             if last_shared_commit == last_commit_trunk {
                 println!("git commit -m {}", message);
-                self.executor.run_command("git", &format!("commit -m \"{}\"", message));
+                self.executor.run_explicit_command("git", 
+                                                   vec!["commit",  "-m", format!("{}", message).as_str()]
+                );
                 Ok(())
             } else {
                 Err("okok".to_string())

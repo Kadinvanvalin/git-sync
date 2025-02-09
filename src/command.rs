@@ -4,6 +4,7 @@ use std::process::{Command};
 pub trait CommandExecutor {
     fn run_command(&self, command: &str, args: &str) -> String;
     fn command_success(&self, command: &str, args: &str) -> bool;
+    fn run_explicit_command(&self, command: &str, args: Vec<&str>) -> String;
 }
 pub struct RealCommandExecutor;
 
@@ -30,7 +31,7 @@ impl CommandExecutor for RealCommandExecutor {
                 Ok(String::from_utf8_lossy(&output.stdout).to_string())
             },
             false => {
-                Err("opps")
+                Err(&output.stderr)
             }
         }.expect(&format!("Failed to execute command: {} {}",
                           command,
@@ -38,7 +39,30 @@ impl CommandExecutor for RealCommandExecutor {
 
 
     }
+
+    fn run_explicit_command(&self, command: &str, args: Vec<&str>) -> String {
+        let output = Command::new(command)
+            .args(&args)
+            .output()
+            .expect("failed to call command");
+
+
+        match output.status.success() {
+            true => {
+                Ok(String::from_utf8_lossy(&output.stdout).to_string())
+            },
+            false => {
+                Err(&output.stderr)
+            }
+        }.expect(&format!("Failed to execute command: {} {:?}",
+                          command,
+                          args))
+
+
+    }
 }
+
+
 
 pub struct DebugCommandExecutor;
 
@@ -51,5 +75,9 @@ impl CommandExecutor for DebugCommandExecutor {
     fn command_success(&self, command: &str, args: &str) -> bool {
         println!("DEBUG: Pretending `{}` with args `{}` succeeded", command, args);
         true // Always return success during debug mode
+    }
+
+    fn run_explicit_command(&self, command: &str, args:Vec<&str> ) -> String {
+        todo!()
     }
 }
