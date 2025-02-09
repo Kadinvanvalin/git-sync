@@ -1,8 +1,41 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt::format;
 use std::process::Command;
+use serde::{Deserialize, Serialize};
+use toml::Table;
 use crate::command;
 
+
+
+#[derive(Deserialize, Debug)]
+pub struct Project {
+    pub ssh_url_to_repo: String,
+    pub path_with_namespace: String,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct Projects {
+    groups: HashMap<String, Group>,
+
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+pub struct SettingsConfig {
+    pub remotes: HashMap<String, RemoteSettings>,
+}
+#[derive(Deserialize, Serialize, Debug)]
+pub struct RemoteSettings {
+    pub project_directory: String,
+    pub gitlab_api_url: String,
+    pub watch_groups: Vec<String>,
+    pub watch_projects: Vec<String>,
+}
+
+#[derive(Deserialize, Serialize, Debug)]
+struct Group {
+    projects: Vec<String>,
+}
 pub trait Git {
     fn commit(&self, message: &str) -> Result<(), String>;
     fn status(&self) -> Result<String, String>;
