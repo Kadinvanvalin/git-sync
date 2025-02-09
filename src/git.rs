@@ -85,8 +85,8 @@ impl<'a> Git for RealGit<'a> {
                 .run_command("git", &format!("rev-parse origin/{}", trunk));
 
             if last_shared_commit == last_commit_trunk {
-                println!("git commit");
-                // run_command("git", "commit");
+                println!("git commit -m {}", message);
+                self.executor.run_command("git", &format!("commit -m \"{}\"", message));
                 Ok(())
             } else {
                 Err("okok".to_string())

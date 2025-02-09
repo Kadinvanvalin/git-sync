@@ -4,18 +4,24 @@ mod gitlab;
 mod dolly;
 
 use std::{env, fs};
-use std::process::Command;
-use clap::{Parser, Subcommand};
+
+use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
 use crate::command::DebugCommandExecutor;
 use crate::command::RealCommandExecutor;
 use crate::git::{Git, RealGit, SettingsConfig};
-
+#[derive(Args, Debug)]
+struct CommitMessage {
+    #[clap(trailing_var_arg=true)]
+    commit_message: Vec<String>,
+    // #[arg(short, long)]
+    // option_for_one: Option<String>,
+}
 #[derive(Subcommand)]
 enum Commands {
     Status,
-    Commit,
+    Commit(CommitMessage),
     Remote,
 }
 #[derive(Parser)]
@@ -57,8 +63,8 @@ async fn main() {
             git.status();
             println!("status")
         }
-        Commands::Commit => {
-            git.commit("message - need to take from args");
+        Commands::Commit(message) => {
+            git.commit(message.commit_message.join(" ").as_str()).expect("TODO: panic message");
             println!("commit")
         }
         Commands::Remote => {
