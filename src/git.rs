@@ -95,13 +95,6 @@ impl<'a> Git for RealGit<'a> {
                 Err("okok".to_string())
                 //drift(last_shared_commit)
             }
-
-
-
-
-
-
-
     }
 
     fn status(&self) -> Result<String, String> {
