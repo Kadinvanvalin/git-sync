@@ -1,3 +1,6 @@
+mod command;
+mod git;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Subcommand)]
@@ -14,9 +17,6 @@ pub struct App {
 
 #[tokio::main]
 async fn main() {
-  
-    println!("Hello, world!");
-
     let args = App::parse();
     
     match args.cmd { 
@@ -24,6 +24,7 @@ async fn main() {
             println!("status")
         }
         Commands::Commit => {
+            git::commit();
             println!("commit")
         }
     }

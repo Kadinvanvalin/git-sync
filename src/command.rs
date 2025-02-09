@@ -1,20 +1,29 @@
-use std::process::{Command, Output};
-use std::io;
+use std::process::{Command, ExitStatus, Output};
 
-fn run_command(command: &str, args: &[&str]) -> io::Result<Output> {
+pub fn command_success(command: &str, args: &str) -> bool {
+    Command::new(command)
+    .args(args.split(" "))
+    .output()
+    .expect("failed to call command").status.success()
+}
+
+pub fn run_command(command: &str, args: &str) -> String {
     let output = Command::new(command)
-        .args(args)
-        .output();
-
-    match output {
-        Ok(output) => Ok(output),
-        Err(e) => {
-            eprintln!(
-                "Failed to execute command: {} {}",
-                command,
-                args.join(" ")
-            );
-            Err(e)
+        .args(args.split(" "))
+        .output()
+        .expect("failed to call command");
+    
+    
+    match output.status.success() {
+        true => {
+            Ok(String::from_utf8_lossy(&output.stdout).to_string())
+        },
+        false  => {
+            Err("opps")
         }
-    }
+    }.expect(&format!("Failed to execute command: {} {}",
+                      command,
+                      args))
+    
+    
 }
