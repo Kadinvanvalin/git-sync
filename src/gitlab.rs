@@ -1,10 +1,8 @@
-use std::collections::HashMap;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use toml::Value;
 use crate::git::Project;
 

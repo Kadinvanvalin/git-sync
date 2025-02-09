@@ -55,7 +55,7 @@ impl<'a> RealGit<'a> {
 impl<'a> Git for RealGit<'a> {
     fn push(&self) -> () {
         let stdout = self.executor.run_command("git", "push");
-        println!("{}", stdout)
+        println!("Pushing {}", stdout)
     }
     fn remote(&self) {
         let url = self.executor
