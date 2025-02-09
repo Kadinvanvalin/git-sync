@@ -1,8 +1,10 @@
 mod command;
 mod git;
 mod gitlab;
+mod dolly;
 
 use std::{env, fs};
+use std::process::Command;
 use clap::{Parser, Subcommand};
 use dotenv::dotenv;
 use serde::{Deserialize, Serialize};
@@ -14,6 +16,7 @@ use crate::git::{Git, RealGit, SettingsConfig};
 enum Commands {
     Status,
     Commit,
+    Remote,
 }
 #[derive(Parser)]
 pub struct App {
@@ -57,6 +60,10 @@ async fn main() {
         Commands::Commit => {
             git.commit("message - need to take from args");
             println!("commit")
+        }
+        Commands::Remote => {
+            git.remote();
+            // Command::new("open").args("https://github.com".split(" ")).output();
         }
     }
 }

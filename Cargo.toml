@@ -11,3 +11,4 @@ tokio = { version = "1.43.0", features = ["rt", "rt-multi-thread", "macros"] }
 dirs = "6.0.0"
 fzf-wrapped = "0.1.4"
 toml = "0.8.20"
+regex = "1.11.1"
