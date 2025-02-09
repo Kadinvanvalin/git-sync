@@ -42,7 +42,7 @@ pub(crate) fn find_trunk() -> String {
         let remote_trunk = format!("origin/{}", trunk);
         //show-ref --verify ref/head/
         // will panic? maybe broke it
-        let exists = command_success("git", &format!("show-ref --verify ref/heads/{}", trunk));
+        let exists = command_success("git", &format!("show-ref --verify refs/heads/{}", trunk));
         if !exists {
             continue
         }
