@@ -31,8 +31,8 @@ pub struct App {
 
 #[tokio::main]
 async fn main() {
-  
- 
+
+
 
     let args = App::parse();
     if args.gitlab {
@@ -51,7 +51,7 @@ async fn main() {
     } else {
         RealGit::new(&RealCommandExecutor)
     };
-    
+
     match args.cmd {
         Commands::Status => {
             git.status();

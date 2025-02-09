@@ -63,15 +63,11 @@ impl<'a> Git for RealGit<'a> {
         if valid_ssh_url(&*url) {
             
             let url = make_url(&url);
-            Command::new("open")
-                .arg(url)
-                .output()
-                .expect("TODO: panic message");
+            self.executor
+                .run_command("open", &*url);
         } else {
-            Command::new("open")
-                .arg(url)
-                .output()
-                .expect("TODO: panic message");
+            self.executor
+                .run_command("open", &*url);
         }
         
         
