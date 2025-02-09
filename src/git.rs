@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 
@@ -104,41 +103,6 @@ impl<'a> Git for RealGit<'a> {
         Ok(self.executor.run_command("git", "status"))
     }
 }
-
-// pub(crate) fn commit() {
-//     let trunk = find_trunk();
-//     let last_shared_commit = merge_base(trunk.clone());
-//     let last_commit_trunk = last_commit_trunk(trunk.clone());
-//
-//     if last_shared_commit == last_commit_trunk {
-//         println!("git commit")
-//         // run_command("git", "commit");
-//     } else {
-//         //drift(last_shared_commit)
-//     }
-// }
-// pub(crate) async fn fetch() -> std::process::Output {
-//     run_command("git", "fetch origin");
-//     Command::new("git")
-//         .arg("fetch")
-//         // .current_dir()
-//         .output()
-//         .expect("TODO: panic message")
-//
-// }
-
-// pub(crate) fn status() -> std::process::Output {
-//     Command::new("git")
-//         .arg("status")
-//         .arg("-s")
-//         // .current_dir()
-//         .output()
-//         .expect("TODO: panic message")
-//
-// }
-
-
-
 pub(crate) fn find_trunk(executor: &dyn CommandExecutor) -> String {
     let possible_trunks = ["main", "master"];
     for trunk in &possible_trunks {
