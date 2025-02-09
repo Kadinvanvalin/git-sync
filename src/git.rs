@@ -1,7 +1,5 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
-use std::fmt::format;
-use std::process::Command;
 use serde::{Deserialize, Serialize};
 
 
@@ -58,9 +56,9 @@ impl<'a> Git for RealGit<'a> {
     fn remote(&self) {
         let url = self.executor
             .run_command("git", "remote get-url origin");
-        
+
         if valid_ssh_url(&*url) {
-            
+
             let url = make_url(&url);
             self.executor
                 .run_command("open", &*url);
@@ -68,8 +66,8 @@ impl<'a> Git for RealGit<'a> {
             self.executor
                 .run_command("open", &*url);
         }
-        
-        
+
+
     }
     fn commit(&self, message: &str)  -> Result<(), String> {
         let trunk = find_trunk(self.executor);
@@ -85,7 +83,7 @@ impl<'a> Git for RealGit<'a> {
 
             if last_shared_commit == last_commit_trunk {
                 println!("git commit -m {}", message);
-                self.executor.run_explicit_command("git", 
+                self.executor.run_explicit_command("git",
                                                    vec!["commit",  "-m", format!("{}", message).as_str()]
                 );
                 Ok(())
