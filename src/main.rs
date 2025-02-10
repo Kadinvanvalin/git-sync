@@ -33,6 +33,7 @@ enum Commands {
 enum ProjectOptions {
     Readme,
     Remote,
+    Clone,
 }
 
 impl SkimItem for ProjectOptions {
@@ -40,6 +41,7 @@ impl SkimItem for ProjectOptions {
         match self {
             ProjectOptions::Readme => Cow::Borrowed("Readme"),
             ProjectOptions::Remote => Cow::Borrowed("Remote"),
+            ProjectOptions::Clone => Cow::Borrowed("Clone"),
         }
     }
 }
@@ -67,7 +69,7 @@ async fn main() {
 
     match args.cmd {
         Commands::Status => {
-            git.status();
+            git.status().expect("TODO: panic message");
             println!("status")
         }
         Commands::Commit(message) => {
@@ -84,7 +86,8 @@ async fn main() {
                 dotenv().ok(); // Load environment variables from .env file
                 let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
 
-                let config: SettingsConfig = toml::from_str(&fs::read_to_string(config_path).expect("Failed to read config file")).expect("Failed to parse config file");
+                let config: SettingsConfig = toml::from_str(&fs::read_to_string(config_path)
+                    .expect("Failed to SettingsConfig config file")).expect("Failed to parse SettingsConfig file");
                 let gitlab_api_url = &config.remotes.get("gitlab").expect("it to work").gitlab_api_url;
                 let private_token = env::var("PRIVATE_TOKEN").expect("PRIVATE_TOKEN not set");
                 let squad = config.remotes.get("gitlab").unwrap().watch_groups.join(",");
@@ -102,8 +105,8 @@ async fn main() {
 fn view_projects() {
     let groups_path = dirs::home_dir().unwrap().join(".config/gits/gitlab.cj.dev.toml");
     let projects = toml::from_str::<Projects>(&fs::read_to_string(groups_path)
-        .expect("Failed to read group file"))
-        .expect("Failed to parse config file")
+        .expect("Failed to read projects file"))
+        .expect("Failed to parse projects file")
         .groups;
 
 
@@ -151,19 +154,18 @@ fn view_projects() {
             print!("TODO multiple readme names");
             Command::new("open").arg(
                 &format!("https://{}/{}/{}{}", repo.host, repo.slug, repo.repo_name, "/blob/master/README.md")
-            ).output();
+            ).output().expect("TODO: panic message");
          }
        "Remote" => {
             print!("opening remote {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
             Command::new("open").arg(
                 &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name)
-            ).output();
+            ).output().expect("TODO: panic message");
         }
-    // if selectedCommand.get(0).unwrap().eq("remote") {
-    //     print!("opening remote");
-    //     Command::new("open").arg(
-    //         &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name)
-    //     );
+        "Clone" => {
+            print!("TODO: idk if its worth it because I can't cd to the location? {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
+           
+        }
         _ => {}
     }
 
