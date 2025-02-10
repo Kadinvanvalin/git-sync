@@ -6,7 +6,7 @@ use reqwest::Client;
 use toml::Value;
 use crate::git::Project;
 
-async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Result<Vec<Project>, reqwest::Error> {
+pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Result<Vec<Project>, reqwest::Error> {
     let client = Client::new();
     let mut projects = Vec::new();
     let mut page = 1;
@@ -39,7 +39,7 @@ async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Result<V
 }
 
 
-async fn sparse_clone_projects(projects: Vec<Project>) {
+pub async fn sparse_clone_projects(projects: Vec<Project>) {
 
     let config_path = dirs::home_dir().unwrap().join(".config/gits/gitlab.cj.dev.toml");
 

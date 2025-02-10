@@ -36,8 +36,6 @@ impl CommandExecutor for RealCommandExecutor {
         }.expect(&format!("Failed to execute command: {} {}",
                           command,
                           args))
-
-
     }
 
     fn run_explicit_command(&self, command: &str, args: Vec<&str>) -> String {
@@ -57,8 +55,6 @@ impl CommandExecutor for RealCommandExecutor {
         }.expect(&format!("Failed to execute command: {} {:?}",
                           command,
                           args))
-
-
     }
 }
 

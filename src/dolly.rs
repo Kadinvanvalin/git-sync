@@ -1,6 +1,5 @@
 use regex::Regex;
 
-
 #[derive(PartialEq, Debug)]
 pub struct GitRepo {
     pub host: String,
@@ -20,7 +19,7 @@ pub fn valid_ssh_url(url: &str) -> bool {
 pub fn make_url(url: &str) -> String {
     make_url_private(parse_url(url))
 }
-fn make_url_private(git_repo: GitRepo) -> String {
+pub fn make_url_private(git_repo: GitRepo) -> String {
     String::from(&format!(
         "https://{}/{}/{}",
         git_repo.host, git_repo.slug, git_repo.repo_name

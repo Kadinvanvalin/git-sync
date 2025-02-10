@@ -11,8 +11,8 @@ pub struct Project {
 }
 
 #[derive(Deserialize, Serialize, Debug)]
-struct Projects {
-    groups: HashMap<String, Group>,
+pub struct Projects {
+    pub(crate) groups: HashMap<String, Vec<String>>,
 
 }
 
@@ -28,8 +28,8 @@ pub struct RemoteSettings {
     pub watch_projects: Vec<String>,
 }
 
-#[derive(Deserialize, Serialize, Debug)]
-struct Group {
+#[derive(Deserialize, Serialize, Debug, Clone)]
+pub struct Group {
     projects: Vec<String>,
 }
 pub trait Git {
