@@ -135,7 +135,7 @@ fn view_projects() {
 
     let options = SkimOptions::default();
     let (tx, rx): (SkimItemSender, SkimItemReceiver) = skim::prelude::unbounded();
-    let commands = vec![ProjectOptions::Readme, ProjectOptions::Remote];
+    let commands = vec![ProjectOptions::Remote, ProjectOptions::Clone];
     for command in commands {
             tx.send(Arc::new(command)).expect("TODO: panic message");
     }
@@ -161,8 +161,22 @@ fn view_projects() {
             ).output().expect("TODO: panic message");
         }
         "Clone" => {
-            print!("TODO: idk if its worth it because I can't cd to the location? {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
-           
+            println!("trying to CD!!");
+            //print!("TODO: idk if its worth it because I can't cd to the location? {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
+            let home_dir = dirs::home_dir().unwrap();
+            //git clone git@github.com:whatever folder-name
+            //git@gitlab.cj.dev:chacevedodiaz2/disk-usage-scala.git
+            //mkdir -p foo/bar/baz
+            Command::new("mkdir")
+                .arg("-p")
+                .arg(&format!("{}/{}/{}", home_dir.display(), repo.host, repo.slug))
+                .output().expect("TODO: panic message");
+            Command::new("git")
+                .arg("clone")
+                .arg(
+                &format!("git@{}:{}/{}.git", repo.host, repo.slug, repo.repo_name)
+            ).arg(&format!("{}/{}/{}", home_dir.display(), repo.host, repo.slug)).output().expect("TODO: panic message");
+            println!("cd {}/{}/{}/{}", home_dir.display(), repo.host, repo.slug, repo.repo_name);
         }
         _ => {}
     }

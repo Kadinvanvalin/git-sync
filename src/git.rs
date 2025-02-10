@@ -37,6 +37,7 @@ pub trait Git {
     fn status(&self) -> Result<String, String>;
     fn remote(&self) -> ();
     fn push(&self) -> ();
+    fn clone_repo(&self, project: &Project) -> ();
 }
 
 use crate::command::CommandExecutor;
@@ -53,6 +54,9 @@ impl<'a> RealGit<'a> {
 }
 
 impl<'a> Git for RealGit<'a> {
+    fn clone_repo(&self, project: &Project) -> () {
+        
+    }
     fn push(&self) -> () {
         let stdout = self.executor.run_command("git", "push");
         println!("Pushing: {}", stdout)
