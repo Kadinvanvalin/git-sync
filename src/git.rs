@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::process::Command;
 use serde::{Deserialize, Serialize};
 
 
@@ -37,11 +38,11 @@ pub trait Git {
     fn status(&self) -> Result<String, String>;
     fn remote(&self) -> ();
     fn push(&self) -> ();
-    fn clone_repo(&self, project: &Project) -> ();
+    fn clone_repo(&self, repo: &GitRepo) -> ();
 }
 
 use crate::command::CommandExecutor;
-use crate::dolly::{make_url, valid_ssh_url};
+use crate::dolly::{make_url, valid_ssh_url, GitRepo};
 
 pub struct RealGit<'a> {
     executor: &'a dyn CommandExecutor, // Reference to the executor
@@ -54,9 +55,15 @@ impl<'a> RealGit<'a> {
 }
 
 impl<'a> Git for RealGit<'a> {
-    fn clone_repo(&self, project: &Project) -> () {
-        
+    fn clone_repo(&self, repo: &GitRepo) -> () {
+        let home_dir = dirs::home_dir().unwrap();
+        self.executor.run_command("mkdir", &format!("mkdir -p {}/{}/{}", home_dir.display(), repo.host, repo.slug));
+        let clone = &format!("clone git@{1}:{2}/{3}.git {0}/{1}/{2}",  home_dir.display(), repo.host, repo.slug, repo.repo_name);
+        self.executor
+            .run_command("git", clone);
+        println!("cd {}/{}/{}/{}", home_dir.display(), repo.host, repo.slug, repo.repo_name);
     }
+    
     fn push(&self) -> () {
         let stdout = self.executor.run_command("git", "push");
         println!("Pushing: {}", stdout)

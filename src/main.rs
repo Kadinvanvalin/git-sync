@@ -95,12 +95,12 @@ async fn main() {
 
         }
         Commands::List => {
-            view_projects();
+            view_projects(&git);
         }
     }
 }
 
-fn view_projects() {
+fn view_projects(git: &RealGit) {
     let groups_path = dirs::home_dir().unwrap().join(".config/gits/gitlab.cj.dev.toml");
     let projects = toml::from_str::<Projects>(&fs::read_to_string(groups_path)
         .expect("Failed to read projects file"))
@@ -162,21 +162,9 @@ fn view_projects() {
         }
         "Clone" => {
             println!("trying to CD!!");
+            git.clone_repo(&repo);
             //print!("TODO: idk if its worth it because I can't cd to the location? {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
-            let home_dir = dirs::home_dir().unwrap();
-            //git clone git@github.com:whatever folder-name
-            //git@gitlab.cj.dev:chacevedodiaz2/disk-usage-scala.git
-            //mkdir -p foo/bar/baz
-            Command::new("mkdir")
-                .arg("-p")
-                .arg(&format!("{}/{}/{}", home_dir.display(), repo.host, repo.slug))
-                .output().expect("TODO: panic message");
-            Command::new("git")
-                .arg("clone")
-                .arg(
-                &format!("git@{}:{}/{}.git", repo.host, repo.slug, repo.repo_name)
-            ).arg(&format!("{}/{}/{}", home_dir.display(), repo.host, repo.slug)).output().expect("TODO: panic message");
-            println!("cd {}/{}/{}/{}", home_dir.display(), repo.host, repo.slug, repo.repo_name);
+           
         }
         _ => {}
     }
