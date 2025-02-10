@@ -4,17 +4,15 @@ mod gitlab;
 mod dolly;
 use std::{env, fs};
 use std::borrow::Cow;
-use std::collections::HashMap;
 use std::process::Command;
 use std::sync::Arc;
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
-use serde::{Deserialize, Serialize};
 use skim::{Skim, SkimItem, SkimItemReceiver, SkimItemSender, SkimOptions};
 use crate::command::DebugCommandExecutor;
 use crate::command::RealCommandExecutor;
 use crate::dolly::GitRepo;
-use crate::git::{Git, Group, Projects, RealGit, SettingsConfig};
+use crate::git::{Git, Projects, RealGit, SettingsConfig};
 use crate::gitlab::{get_all_projects, sparse_clone_projects};
 #[derive(Args, Debug)]
 struct CommitMessage {
