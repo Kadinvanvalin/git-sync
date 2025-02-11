@@ -2,13 +2,10 @@
 # Print the current working directory and environment variables before running the Rust program
 
 # Run the Rust program and capture the output
-output=$(gits "$@")
-if echo "$output" | grep -q "^cd "; then
+ { output=$(gits "$@" | tee /dev/fd/3 | grep  "^cd" | cut -d' ' -f2-); } 3>&1
+echo "should do:: $output"
     # Extract the path from the output and change the directory
-    p=$(echo "$output" | grep "^cd " | cut -d' ' -f2-)wrap
-    cd "$p"
-    echo "$output"
-else
-    echo "$output"
+if [ -n "$output" ]; then
+    cd "$output"
 fi
 

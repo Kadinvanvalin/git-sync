@@ -125,7 +125,7 @@ fn view_projects(git: &RealGit) {
     let x = Skim::run_with(&options, Some(rx));
     let binding = x.expect("should have worked");
     let binding = binding.selected_items.iter().map(|item| item.output()).collect::<Vec<_>>();
-    let repo = parse_url(format!("git@gitlab.cj.dev:{}.git",binding[0]));
+    let repo = parse_url(&format!("git@gitlab.cj.dev:{}.git",binding[0]));
     
 
 
