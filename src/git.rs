@@ -58,7 +58,7 @@ impl<'a> Git for RealGit<'a> {
     fn clone_repo(&self, repo: &GitRepo) -> () {
         let home_dir = dirs::home_dir().unwrap();
         self.executor.run_command("mkdir", &format!("-p {}/{}/{}", home_dir.display(), repo.host, repo.slug));
-        let clone = &format!("clone git@{1}:{2}/{3}.git {0}/{1}/{2}",  home_dir.display(), repo.host, repo.slug, repo.repo_name);
+        let clone = &format!("clone git@{1}:{2}/{3}.git {0}/{1}/{2}/{3}",  home_dir.display(), repo.host, repo.slug, repo.repo_name);
         self.executor
             .run_command("git", clone);
         println!("cd {}/{}/{}/{}", home_dir.display(), repo.host, repo.slug, repo.repo_name);

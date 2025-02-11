@@ -6,7 +6,7 @@ output=$(gits "$@")
 if echo "$output" | grep -q "^cd "; then
     # Extract the path from the output and change the directory
     p=$(echo "$output" | grep "^cd " | cut -d' ' -f2-)wrap
-#    cd "$p"
+    cd "$p"
     echo "$output"
 else
     echo "$output"
