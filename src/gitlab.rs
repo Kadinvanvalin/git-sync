@@ -4,6 +4,7 @@ use std::io::Write;
 use std::process::Command;
 use reqwest::Client;
 use toml::Value;
+use crate::dolly::GitRepo;
 use crate::git::Project;
 
 pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Result<Vec<Project>, reqwest::Error> {
@@ -39,16 +40,16 @@ pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Resu
 }
 
 
-pub async fn sparse_clone_projects(projects: Vec<Project>) {
+pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
 
     let config_path = dirs::home_dir().unwrap().join(".config/gits/gitlab.cj.dev.toml");
 
     let mut config: Value = toml::from_str(&fs::read_to_string(&config_path).unwrap_or_else(|_| "[groups]\nprojects = []".to_string())).expect("Failed to parse config file");
     print!("{:?}", &projects);
-    for proj in projects {
+    for repo in projects {
 
         let base_dir = dirs::home_dir().unwrap().join("gitlab.cj.dev");
-        let project_dir = base_dir.join(&proj.path_with_namespace);
+        let project_dir = base_dir.join(&repo.slug);
         if project_dir.exists() {
             continue;
         } else {
@@ -61,8 +62,8 @@ pub async fn sparse_clone_projects(projects: Vec<Project>) {
             if let Some(table) = groups.as_table_mut() {
                 println!("table {:?}", &table);
 
-                let group = &proj.path_with_namespace.split("/").collect::<Vec<_>>()[0].to_string();
-                let project = &proj.path_with_namespace.split("/").collect::<Vec<_>>()[1].to_string();
+                let group = &repo.slug;
+                let project = &repo.repo_name;
                 table.entry(group).or_insert(Value::Array(vec![]));
                 println!("{:?}", &table);
                 table.get_mut(group).expect("we just put it there").as_array_mut().expect("we put an array").push(Value::String(project.to_string()));

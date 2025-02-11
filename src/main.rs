@@ -11,7 +11,7 @@ use dotenv::dotenv;
 use skim::{Skim, SkimItem, SkimItemReceiver, SkimItemSender, SkimOptions};
 use crate::command::DebugCommandExecutor;
 use crate::command::RealCommandExecutor;
-use crate::dolly::GitRepo;
+use crate::dolly::{parse_url, project_to_repo, GitRepo};
 use crate::git::{Git, Projects, RealGit, SettingsConfig};
 use crate::gitlab::{get_all_projects, sparse_clone_projects};
 #[derive(Args, Debug)]
@@ -90,7 +90,8 @@ async fn main() {
                 let private_token = env::var("PRIVATE_TOKEN").expect("PRIVATE_TOKEN not set");
                 let squad = config.remotes.get("gitlab").unwrap().watch_groups.join(",");
                 let projects = get_all_projects(gitlab_api_url, &private_token).await.unwrap();
-                sparse_clone_projects(projects).await;
+                let repos = project_to_repo(projects);
+                sparse_clone_projects(repos).await;
             }
 
         }
@@ -99,6 +100,7 @@ async fn main() {
         }
     }
 }
+
 
 fn view_projects(git: &RealGit) {
     let groups_path = dirs::home_dir().unwrap().join(".config/gits/gitlab.cj.dev.toml");
@@ -164,7 +166,7 @@ fn view_projects(git: &RealGit) {
             println!("trying to CD!!");
             git.clone_repo(&repo);
             //print!("TODO: idk if its worth it because I can't cd to the location? {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
-           
+
         }
         _ => {}
     }

@@ -1,4 +1,5 @@
 use regex::Regex;
+use crate::git;
 
 #[derive(PartialEq, Debug)]
 pub struct GitRepo {
@@ -26,7 +27,7 @@ pub fn make_url_private(git_repo: GitRepo) -> String {
     ))
 }
 pub fn parse_url(url: &str) -> GitRepo {
-    let re = Regex::new(r"(git)@([^/:]+):([^/:]+)/(.+)(.git)").expect("failed to parse regex");
+    let re = Regex::new(r"(git)@([^/:]+):(.+)/([^/:]+)(.git)").expect("failed to parse regex");
 
     let caps = re.captures(&url).unwrap();
     let host = caps.get(2).map_or("", |m| m.as_str());
@@ -36,5 +37,31 @@ pub fn parse_url(url: &str) -> GitRepo {
         host: host.parse().unwrap(),
         slug: slug.parse().unwrap(),
         repo_name: repo_name.parse().unwrap(),
+    }
+}
+
+pub fn project_to_repo(projects: Vec<git::Project>) -> Vec<GitRepo> {
+    projects.iter().map(|p|
+        parse_url(&*p.ssh_url_to_repo)
+    ).collect()
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn convert_works() {
+        let projects = vec![
+            git::Project {
+                ssh_url_to_repo: "git@gitlab.company.dev:squad/tools/mytool.git".to_string(),
+                path_with_namespace: "".to_string(),
+            }
+        ];
+        let result = project_to_repo(projects);
+        assert_eq!(result[0], GitRepo{
+            host: "gitlab.company.dev".to_string(),
+            slug: "squad/tools".to_string(),
+            repo_name: "mytool".to_string(),
+        });
     }
 }
