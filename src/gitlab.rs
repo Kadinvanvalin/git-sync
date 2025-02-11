@@ -48,8 +48,8 @@ pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
     print!("{:?}", &projects);
     for repo in projects {
 
-        let base_dir = dirs::home_dir().unwrap().join("gitlab.cj.dev");
-        let project_dir = base_dir.join(&repo.slug);
+        let base_dir = dirs::home_dir().unwrap().join(&repo.host);
+        let project_dir = base_dir.join(&repo.slug).join(&repo.repo_name);
         if project_dir.exists() {
             continue;
         } else {
