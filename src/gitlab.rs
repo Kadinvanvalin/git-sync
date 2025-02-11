@@ -3,7 +3,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
 use reqwest::Client;
-use toml::Value;
+use toml::{toml, Value};
 use crate::dolly::GitRepo;
 use crate::git::Project;
 
@@ -38,43 +38,48 @@ pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Resu
 
     Ok(projects)
 }
-
-
+fn project_is_cloned_local(repo: GitRepo) -> bool {
+    let base_dir = dirs::home_dir().unwrap().join(&repo.host);
+    let project_dir = base_dir.join(&repo.slug).join(&repo.repo_name);
+    // todo - it could not have a .git
+    project_dir.exists()
+}
+// new function to sync and clone all watched projects - do we want watched projects in the same
+// config? it may be too messy. . . I guess if we sync it, it might be ok. Hey, you cloned
+// something, we 
 pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
-
+    // rename - we are just getting all projects for a host
     let config_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}.toml", projects[0].host));
 
-    let mut config: Value = toml::from_str(&fs::read_to_string(&config_path).unwrap_or_else(|_| "[groups]\nprojects = []".to_string())).expect("Failed to parse config file");
-    print!("{:?}", &projects);
+    // let mut config: Value = toml::from_str(&fs::read_to_string(&config_path).unwrap_or_else(|_| "[groups]\nprojects = []".to_string())).expect("Failed to parse config file");
+    let mut config: Value = toml!{ 
+        [groups]
+    }.into();
     for repo in projects {
 
-        let base_dir = dirs::home_dir().unwrap().join(&repo.host);
-        let project_dir = base_dir.join(&repo.slug).join(&repo.repo_name);
-        if project_dir.exists() {
-            continue;
-        } else {
-            println!("does not exist {:?}", project_dir);
-        }
 
+        // if project_is_cloned_local(repo) {
+        //     continue;
+        // } else {
+        //     println!("does not exist {:?}", repo);
+        // }
+        // we don't care if its local - we want them all I think. Maybe we can change the commands for
+        // list-project based on if it is local and watched or not. it should both be cloned and
+        // watched, I don't want to have dangling
 
         if let Some(groups) = config.get_mut("groups") {
-            println!("in {:?}", &groups);
             if let Some(table) = groups.as_table_mut() {
-                println!("table {:?}", &table);
 
                 let group = &repo.slug;
                 let project = &repo.repo_name;
                 table.entry(group).or_insert(Value::Array(vec![]));
-                println!("{:?}", &table);
                 table.get_mut(group).expect("we just put it there").as_array_mut().expect("we put an array").push(Value::String(project.to_string()));
 
 
 
-                println!("{:?}", &table);
             } else {
                 eprintln!(
-                    "Error saving project to {:?}: ",
-                    project_dir,
+                    "Error mut toml config",
                 );
             }
             print!("final config: {:?}", &config);

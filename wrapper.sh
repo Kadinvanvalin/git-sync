@@ -3,7 +3,6 @@
 
 # Run the Rust program and capture the output
  { output=$(gits "$@" | tee /dev/fd/3 | grep  "^cd" | cut -d' ' -f2-); } 3>&1
-echo "should do:: $output"
     # Extract the path from the output and change the directory
 if [ -n "$output" ]; then
     cd "$output"

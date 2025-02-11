@@ -68,8 +68,8 @@ async fn main() {
 
     match args.cmd {
         Commands::Status => {
-            git.status().expect("TODO: panic message");
-            println!("status")
+            let status = git.status().expect("TODO: panic message");
+            println!("{}", status)
         }
         Commands::Commit(message) => {
             git.commit(message.commit_message.join(" ").as_str()).expect("TODO: panic message");
@@ -124,6 +124,10 @@ fn view_projects(git: &RealGit) {
 
     let x = Skim::run_with(&options, Some(rx));
     let binding = x.expect("should have worked");
+    if  binding.is_abort {
+        println!("received escape code. exiting");
+        std::process::exit(0);
+    }
     let binding = binding.selected_items.iter().map(|item| item.output()).collect::<Vec<_>>();
     let repo = parse_url(&format!("git@gitlab.cj.dev:{}.git",binding[0]));
     
@@ -142,6 +146,10 @@ fn view_projects(git: &RealGit) {
 
     let command = Skim::run_with(&options, Some(rx));
     let binding = command.expect("should have worked");
+    if  binding.is_abort {
+        println!("received escape code. exiting");
+        std::process::exit(0);
+    }
     let selected_command = binding.selected_items.get(0).unwrap();
 
     print!("selectedCommand: {}", selected_command.text());

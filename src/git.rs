@@ -34,6 +34,7 @@ pub struct Group {
     projects: Vec<String>,
 }
 pub trait Git {
+    fn sync_projects(&self, projects: Vec<GitRepo>) -> ();
     fn commit(&self, message: &str) -> Result<(), String>;
     fn status(&self) -> Result<String, String>;
     fn remote(&self) -> ();
@@ -55,7 +56,18 @@ impl<'a> RealGit<'a> {
 }
 
 impl<'a> Git for RealGit<'a> {
+    fn sync_projects(&self, projects: Vec<GitRepo>) {
+    print!("{:?}", &projects);
+    for repo in projects {
+        // need to sync if already cloned, or clone if we cant fetch?
+       self.clone_repo(&repo); 
+
+
+        }
+    }
+
     fn clone_repo(&self, repo: &GitRepo) -> () {
+        // Maybe we want it to be clone/sync? maybe seperate
         let home_dir = dirs::home_dir().unwrap();
         self.executor.run_command("mkdir", &format!("-p {}/{}/{}", home_dir.display(), repo.host, repo.slug));
         let clone = &format!("clone git@{1}:{2}/{3}.git {0}/{1}/{2}/{3}",  home_dir.display(), repo.host, repo.slug, repo.repo_name);
