@@ -42,7 +42,7 @@ pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Resu
 
 pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
 
-    let config_path = dirs::home_dir().unwrap().join(".config/gits/gitlab.cj.dev.toml");
+    let config_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}.toml", projects[0].host);
 
     let mut config: Value = toml::from_str(&fs::read_to_string(&config_path).unwrap_or_else(|_| "[groups]\nprojects = []".to_string())).expect("Failed to parse config file");
     print!("{:?}", &projects);

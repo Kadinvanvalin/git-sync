@@ -4,6 +4,7 @@ mod gitlab;
 mod dolly;
 use std::{env, fs};
 use std::borrow::Cow;
+use std::fmt::format;
 use std::process::Command;
 use std::sync::Arc;
 use clap::{Args, Parser, Subcommand};
@@ -124,15 +125,11 @@ fn view_projects(git: &RealGit) {
     let x = Skim::run_with(&options, Some(rx));
     let binding = x.expect("should have worked");
     let binding = binding.selected_items.iter().map(|item| item.output()).collect::<Vec<_>>();
-    let selectedProject = binding[0].split("/");
-    let repo = GitRepo {
-        host: String::from("gitlab.cj.dev"),
-        slug: String::from(selectedProject.clone().collect::<Vec<_>>()[0]),
-        repo_name: String::from(selectedProject.clone().collect::<Vec<_>>()[1]),
-    };
+    let repo = parse_url(format!("git@gitlab.cj.dev:{}.git",binding[0]));
+    
 
 
-    println!("{:?}", selectedProject);
+    println!("{:?}", repo);
 
 
     let options = SkimOptions::default();
