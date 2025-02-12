@@ -2,14 +2,18 @@ mod command;
 mod git;
 mod gitlab;
 mod dolly;
+
+
 use std::{env, fs};
 use std::borrow::Cow;
-use std::fmt::format;
+use std::io::Cursor;
+
 use std::process::Command;
 use std::sync::Arc;
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use skim::{Skim, SkimItem, SkimItemReceiver, SkimItemSender, SkimOptions};
+use skim::options::SkimOptionsBuilder;
 use crate::command::DebugCommandExecutor;
 use crate::command::RealCommandExecutor;
 use crate::dolly::{parse_url, project_to_repo, GitRepo};
@@ -27,7 +31,8 @@ enum Commands {
     Commit(CommitMessage),
     Remote,
     Sync,
-    List
+    List, 
+    Prototype
 }
 enum ProjectOptions {
     Readme,
@@ -81,15 +86,18 @@ async fn main() {
             // Command::new("open").args("https://github.com".split(" ")).output();
         }
         Commands::Sync =>{
+            let host = "localhost";
+            // skim with all remotes? autopick if only one?
             if args.gitlab {
                 dotenv().ok(); // Load environment variables from .env file
                 let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
 
                 let config: SettingsConfig = toml::from_str(&fs::read_to_string(config_path)
                     .expect("Failed to SettingsConfig config file")).expect("Failed to parse SettingsConfig file");
-                let gitlab_api_url = &config.remotes.get("gitlab").expect("it to work").gitlab_api_url;
-                let private_token = env::var("PRIVATE_TOKEN").expect("PRIVATE_TOKEN not set");
-                let squad = config.remotes.get("gitlab").unwrap().watch_groups.join(",");
+                let gitlab_api_url = &config.remotes.get(host).expect("it to work").gitlab_api_url;
+                let token_env_location = &config.remotes.get(host).expect("it to work").token;
+                let private_token = env::var(&token_env_location).expect("can't find token");
+                let squad = config.remotes.get(host).unwrap().watch_groups.join(",");
                 let projects = get_all_projects(gitlab_api_url, &private_token).await.unwrap();
                 let repos = project_to_repo(projects);
                 sparse_clone_projects(repos).await;
@@ -97,22 +105,61 @@ async fn main() {
 
         }
         Commands::List => {
-            view_projects(&git);
+            let host = "localhost";
+            // skim with all remotes? autopick if only one?
+            // maybe load ALL?
+            view_projects(&git, host);
+        }
+        Commands::Prototype => {
+            let input_items = vec!["Option 1", "Option 2", "Option 3"];
+            let input = input_items.join("\n"); // Create a single input string joined by newlines
+
+            // Configure skim
+            let options = SkimOptionsBuilder::default()
+                .prompt("Select an option > ".parse().unwrap()) // Set a custom prompt
+                .height("50%".parse().unwrap()) // Restrict height (optional)
+                .multi(false) // Disable multi-select
+                .build()
+                .unwrap();
+            let (tx, rx): (SkimItemSender, SkimItemReceiver) =  skim::prelude::unbounded();
+            // Send items into the channel
+            for item in input_items {
+                tx.send(Arc::new(item.to_string())).unwrap(); // Wrap each item in Arc<String>
+            }
+            drop(tx); // Close the sender so skim knows no more items will be sent
+
+            // Run skim
+            let selected_items = Skim::run_with(&options, Some(rx))
+                .map(|out| out.selected_items) // Get selected items
+                .unwrap_or_else(|| Vec::new()); // Fallback to empty vector if nothing selected
+
+            // Process the result
+            if let Some(selected_item) = selected_items.get(0) {
+                println!("You selected: {}", selected_item.output());
+            } else {
+                println!("No selection made");
+            }
+
         }
     }
 }
 
 
-fn view_projects(git: &RealGit) {
-    let groups_path = dirs::home_dir().unwrap().join(".config/gits/gitlab.cj.dev.toml");
+fn view_projects(git: &RealGit, host: &str) {
+    
+    
+    let groups_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}.toml", host));
     let projects = toml::from_str::<Projects>(&fs::read_to_string(groups_path)
         .expect("Failed to read projects file"))
         .expect("Failed to parse projects file")
         .groups;
 
 
-    //
-    let options = SkimOptions::default();
+    let options = SkimOptionsBuilder::default().prompt("Select an option > ".parse().unwrap()) // Set a custom prompt
+        .height("50%".parse().unwrap()) // Restrict height (optional)
+        .multi(false) // Disable multi-select
+        .build()
+        .unwrap();
     let (tx, rx): (SkimItemSender, SkimItemReceiver) = skim::prelude::unbounded();
 
     for (slug, group) in &projects {
@@ -129,14 +176,13 @@ fn view_projects(git: &RealGit) {
         std::process::exit(0);
     }
     let binding = binding.selected_items.iter().map(|item| item.output()).collect::<Vec<_>>();
-    let repo = parse_url(&format!("git@gitlab.cj.dev:{}.git",binding[0]));
+    let repo = parse_url(&format!("git@{}:{}.git",host, binding[0]));
     
 
 
     println!("{:?}", repo);
-
-
-    let options = SkimOptions::default();
+    
+    
     let (tx, rx): (SkimItemSender, SkimItemReceiver) = skim::prelude::unbounded();
     let commands = vec![ProjectOptions::Remote, ProjectOptions::Clone];
     for command in commands {

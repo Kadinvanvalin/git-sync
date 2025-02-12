@@ -9,7 +9,15 @@ reqwest = { version = "0.12.12", features = ["json"] }
 serde = { version = "1.0.217", features = ["derive"] }
 tokio = { version = "1.43.0", features = ["rt", "rt-multi-thread", "macros"] }
 dirs = "6.0.0"
-fzf-wrapped = "0.1.4"
 toml = "0.8.20"
 regex = "1.11.1"
 skim = "0.16.0"
+
+rouille = "3.6.2"
+[[bin]]
+name = "gitlab_mock_server"
+test = false
+bench = false
+[dev-dependencies]
+
+

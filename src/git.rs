@@ -23,6 +23,7 @@ pub struct SettingsConfig {
 }
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RemoteSettings {
+    pub token: String,
     pub project_directory: String,
     pub gitlab_api_url: String,
     pub watch_groups: Vec<String>,

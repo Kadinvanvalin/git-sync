@@ -48,7 +48,6 @@ fn project_is_cloned_local(repo: GitRepo) -> bool {
 // config? it may be too messy. . . I guess if we sync it, it might be ok. Hey, you cloned
 // something, we 
 pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
-    // rename - we are just getting all projects for a host
     let config_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}.toml", projects[0].host));
 
     // let mut config: Value = toml::from_str(&fs::read_to_string(&config_path).unwrap_or_else(|_| "[groups]\nprojects = []".to_string())).expect("Failed to parse config file");
@@ -83,7 +82,7 @@ pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
                 );
             }
             print!("final config: {:?}", &config);
-            let mut file = OpenOptions::new().write(true).truncate(true).open(&config_path).expect("Failed to open config file");
+            let mut file = OpenOptions::new().create(true).write(true).truncate(true).open(&config_path).expect("Failed to open config file");
             file.write_all(toml::to_string(&config).expect("Failed to serialize config").as_bytes()).expect("Failed to write config file");
         }
     }

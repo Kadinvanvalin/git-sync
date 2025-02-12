@@ -1,0 +1,6 @@
+[remotes.gitlab]
+token="env var where private token is"
+project_directory="localhost"
+gitlab_api_url="http://localhost"
+watch_groups=[]
+watch_projects=[]
