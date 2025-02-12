@@ -6,14 +6,15 @@ mod dolly;
 
 use std::{env, fs};
 use std::borrow::Cow;
-use std::io::Cursor;
-
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::process::Command;
 use std::sync::Arc;
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use skim::{Skim, SkimItem, SkimItemReceiver, SkimItemSender, SkimOptions};
 use skim::options::SkimOptionsBuilder;
+use toml::Value;
 use crate::command::DebugCommandExecutor;
 use crate::command::RealCommandExecutor;
 use crate::dolly::{parse_url, project_to_repo, GitRepo};
@@ -86,14 +87,15 @@ async fn main() {
             // Command::new("open").args("https://github.com".split(" ")).output();
         }
         Commands::Sync =>{
-            let host = "localhost";
+         
             // skim with all remotes? autopick if only one?
             if args.gitlab {
                 dotenv().ok(); // Load environment variables from .env file
                 let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
-
+                
                 let config: SettingsConfig = toml::from_str(&fs::read_to_string(config_path)
                     .expect("Failed to SettingsConfig config file")).expect("Failed to parse SettingsConfig file");
+                let host = config.remotes.keys().next().expect("it to work"); // defaulting to one host
                 let gitlab_api_url = &config.remotes.get(host).expect("it to work").gitlab_api_url;
                 let token_env_location = &config.remotes.get(host).expect("it to work").token;
                 let private_token = env::var(&token_env_location).expect("can't find token");
@@ -146,8 +148,6 @@ async fn main() {
 
 
 fn view_projects(git: &RealGit, host: &str) {
-    
-    
     let groups_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}.toml", host));
     let projects = toml::from_str::<Projects>(&fs::read_to_string(groups_path)
         .expect("Failed to read projects file"))
@@ -215,7 +215,8 @@ fn view_projects(git: &RealGit, host: &str) {
         }
         "Clone" => {
             println!("trying to CD!!");
-            git.clone_repo(&repo);
+            // git.clone_repo(&repo);
+            add_to_watched_projects(repo)
             //print!("TODO: idk if its worth it because I can't cd to the location? {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
 
         }
@@ -224,4 +225,41 @@ fn view_projects(git: &RealGit, host: &str) {
 
 }
 
-
+fn add_to_watched_projects(git_repo: GitRepo) {
+    
+    
+    
+    let config_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}-watched.toml", git_repo.host));
+    let mut config: Value = toml::from_str(&fs::read_to_string(&config_path)
+        .unwrap_or_else(|_| "[groups]\nprojects = []".to_string())).expect("Failed to parse config file");
+    
+    if let Some(groups) = config.get_mut("groups") {
+        if let Some(table) = groups.as_table_mut() {
+            let group = &git_repo.slug;
+            let project = &git_repo.repo_name;
+            table.entry(group).or_insert(Value::Array(vec![]));
+            table.get_mut(group).expect("we just put it there")
+                .as_array_mut()
+                .expect("we put an array")
+                .push(Value::String(project.to_string()));
+            table.get_mut(group).expect("we just put it there")
+                .as_array_mut()
+                .unwrap()
+                .dedup();
+            
+        } else {
+            eprintln!(
+                "Error mut toml config",
+            );
+        }
+        print!("final config: {:?}", &config);
+    }
+    
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(&config_path)
+        .expect("Failed to open config file");
+    file.write_all(toml::to_string(&config)
+        .expect("Failed to serialize config").as_bytes()).expect("Failed to write config file");
+}

@@ -51,7 +51,7 @@ pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
     let config_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}.toml", projects[0].host));
 
     // let mut config: Value = toml::from_str(&fs::read_to_string(&config_path).unwrap_or_else(|_| "[groups]\nprojects = []".to_string())).expect("Failed to parse config file");
-    let mut config: Value = toml!{ 
+    let mut config: Value = toml!{
         [groups]
     }.into();
     for repo in projects {
