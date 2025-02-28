@@ -4,8 +4,9 @@ use std::io::Write;
 use std::process::Command;
 use reqwest::Client;
 use toml::{toml, Value};
+use crate::add_to_watched_projects;
 use crate::dolly::GitRepo;
-use crate::git::Project;
+use crate::git::{Project, SettingsConfig};
 
 pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Result<Vec<Project>, reqwest::Error> {
     let client = Client::new();
@@ -44,6 +45,17 @@ fn project_is_cloned_local(repo: GitRepo) -> bool {
     // todo - it could not have a .git
     project_dir.exists()
 }
+fn is_watch_set_in_base_config(repo: &GitRepo) -> bool {
+       let base_config_path = dirs::home_dir().unwrap().join(format!(".config/gits/config.toml"));
+
+                let config: SettingsConfig = toml::from_str(&fs::read_to_string(base_config_path)
+                    .expect("Failed to SettingsConfig config file"))
+                    .expect("Failed to parse SettingsConfig file");
+                let watch_groups = &config.remotes.get(&repo.host)
+                     .unwrap().watch_groups;
+                let watch_projects = &config.remotes.get(&repo.host).unwrap().watch_projects;
+                watch_groups.contains(&repo.slug) || watch_projects.contains(&format!("{}/{}", repo.slug, repo.repo_name)) 
+}
 // new function to sync and clone all watched projects - do we want watched projects in the same
 // config? it may be too messy. . . I guess if we sync it, it might be ok. Hey, you cloned
 // something, we 
@@ -66,16 +78,19 @@ pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
         // list-project based on if it is local and watched or not. it should both be cloned and
         // watched, I don't want to have dangling
 
+        // write to watched config
+
+        if is_watch_set_in_base_config(&repo) {
+            add_to_watched_projects(&repo);
+        }
+
+        // write to ALL config
         if let Some(groups) = config.get_mut("groups") {
             if let Some(table) = groups.as_table_mut() {
-
                 let group = &repo.slug;
                 let project = &repo.repo_name;
                 table.entry(group).or_insert(Value::Array(vec![]));
                 table.get_mut(group).expect("we just put it there").as_array_mut().expect("we put an array").push(Value::String(project.to_string()));
-
-
-
             } else {
                 eprintln!(
                     "Error mut toml config",
@@ -86,6 +101,9 @@ pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
             file.write_all(toml::to_string(&config).expect("Failed to serialize config").as_bytes()).expect("Failed to write config file");
         }
     }
+
+
+
 }
 
 pub(crate) async fn fetch_and_log_new_commits(slug_filter: &str) {

@@ -5,6 +5,7 @@ mod dolly;
 
 
 use std::{env, fs};
+use std::path::Path;
 use std::borrow::Cow;
 use std::fs::OpenOptions;
 use std::io::Write;
@@ -33,6 +34,7 @@ enum Commands {
     Remote,
     Sync,
     List, 
+    SyncWatched,
     Prototype
 }
 enum ProjectOptions {
@@ -86,6 +88,34 @@ async fn main() {
             git.remote();
             // Command::new("open").args("https://github.com".split(" ")).output();
         }
+        Commands::SyncWatched =>{
+
+                let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
+                let config: SettingsConfig = toml::from_str(&fs::read_to_string(config_path)
+                    .expect("Failed to SettingsConfig config file")).expect("Failed to parse SettingsConfig file");
+            let host = config.remotes.keys().next().expect("it to work"); // defaulting to one host
+            let groups_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}-watched.toml", host));
+            let projects = toml::from_str::<Projects>(&fs::read_to_string(groups_path)
+                .expect("Failed to read projects file"))
+                .expect("Failed to parse projects file")
+                .groups;
+            for (slug, group) in &projects {
+                for project in group {
+                let repo = GitRepo {
+                    slug: slug.to_string(),
+                    repo_name:project.to_string(), 
+                    host: host.to_string(),
+                };  
+                    //.git/FETCH_HEAD
+                    let fetch_head_path =  dirs::home_dir().unwrap().join(format!("{}/{}/{}/.git", repo.host, repo.slug, repo.repo_name)); 
+                    // maybe check if dir exists and delete if not a repo? idk
+                if !Path::new(&fetch_head_path).is_dir() {
+                    println!("cloning {:?}", repo);
+                    git.clone_repo(&repo);
+                    }
+                }
+            }
+        }
         Commands::Sync =>{
          
             // skim with all remotes? autopick if only one?
@@ -107,7 +137,10 @@ async fn main() {
 
         }
         Commands::List => {
-            let host = "localhost";
+            let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
+            let config: SettingsConfig = toml::from_str(&fs::read_to_string(config_path)
+                    .expect("Failed to SettingsConfig config file")).expect("Failed to parse SettingsConfig file");
+            let host = config.remotes.keys().next().expect("it to work"); // defaulting to one host
             // skim with all remotes? autopick if only one?
             // maybe load ALL?
             view_projects(&git, host);
@@ -215,8 +248,8 @@ fn view_projects(git: &RealGit, host: &str) {
         }
         "Clone" => {
             println!("trying to CD!!");
-            // git.clone_repo(&repo);
-            add_to_watched_projects(repo)
+            git.clone_repo(&repo);
+            add_to_watched_projects(&repo)
             //print!("TODO: idk if its worth it because I can't cd to the location? {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
 
         }
@@ -225,10 +258,7 @@ fn view_projects(git: &RealGit, host: &str) {
 
 }
 
-fn add_to_watched_projects(git_repo: GitRepo) {
-    
-    
-    
+pub fn add_to_watched_projects(git_repo: &GitRepo) {
     let config_path = dirs::home_dir().unwrap().join(format!(".config/gits/{}-watched.toml", git_repo.host));
     let mut config: Value = toml::from_str(&fs::read_to_string(&config_path)
         .unwrap_or_else(|_| "[groups]\nprojects = []".to_string())).expect("Failed to parse config file");
@@ -257,6 +287,7 @@ fn add_to_watched_projects(git_repo: GitRepo) {
     
     let mut file = OpenOptions::new()
         .write(true)
+        .create(true)
         .truncate(true)
         .open(&config_path)
         .expect("Failed to open config file");
