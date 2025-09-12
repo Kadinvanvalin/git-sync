@@ -38,7 +38,7 @@ pub trait Git {
     fn sync_projects(&self, projects: Vec<GitRepo>) -> ();
     fn commit(&self, message: &str) -> Result<(), String>;
     fn status(&self) -> Result<String, String>;
-    fn remote(&self) -> ();
+    fn remote(&self) -> String;
     fn push(&self) -> ();
     fn clone_repo(&self, repo: &GitRepo) -> ();
 }
@@ -81,18 +81,15 @@ impl<'a> Git for RealGit<'a> {
         let stdout = self.executor.run_command("git", "push");
         println!("Pushing: {}", stdout)
     }
-    fn remote(&self) {
+
+    fn remote(&self) -> String {
         let url = self.executor
             .run_command("git", "remote get-url origin");
 
         if valid_ssh_url(&*url) {
-
-            let url = make_url(&url);
-            self.executor
-                .run_command("open", &*url);
+            return make_url(&url);
         } else {
-            self.executor
-                .run_command("open", &*url);
+            return (&*url).to_string()
         }
 
 

@@ -60,6 +60,8 @@ pub struct App {
     debug: bool,
     #[arg(short, long, action)]
     gitlab: bool,
+    #[arg(short, long, action)]
+    output: bool,
 }
 
 
@@ -85,7 +87,12 @@ async fn main() {
             println!("commit")
         }
         Commands::Remote => {
-            git.remote();
+            if args.output {
+                print!("{}", git.remote());
+            } else {
+                Command::new("open").args(git.remote().as_str().split(" "));
+            }
+
             // Command::new("open").args("https://github.com".split(" ")).output();
         }
         Commands::SyncWatched =>{
