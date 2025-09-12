@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 pub struct Project {
     pub ssh_url_to_repo: String,
     pub path_with_namespace: String,
+    pub created_at: String,
 }
 
 #[derive(Deserialize, Serialize, Debug)]
@@ -28,6 +29,7 @@ pub struct RemoteSettings {
     pub gitlab_api_url: String,
     pub watch_groups: Vec<String>,
     pub watch_projects: Vec<String>,
+    pub last_pull: String,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

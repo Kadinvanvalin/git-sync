@@ -2,13 +2,14 @@ use std::fs;
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
+use chrono::{DateTime,Utc};
 use reqwest::Client;
 use toml::{toml, Value};
 use crate::add_to_watched_projects;
 use crate::dolly::GitRepo;
 use crate::git::{Project, SettingsConfig};
 
-pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Result<Vec<Project>, reqwest::Error> {
+pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str, last_pull: &DateTime<Utc>) -> Result<Vec<Project>, reqwest::Error> {
     let client = Client::new();
     let mut projects = Vec::new();
     let mut page = 1;
@@ -17,16 +18,25 @@ pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str) -> Resu
         let response = client
             .get(format!("{}/projects", gitlab_api_url))
             .header("Private-Token", private_token)
-            .query(&[("per_page", "100"), ("page", &page.to_string())])
+            .query(&[("per_page", "100"), ("page", &page.to_string()), ("order_by", "created_at"), ("sort", "desc")])
+
             .send()
             .await?;
+            //order_by=created_a maybe I can only get new?
+            // response with    "created_at": "2025-08-20T00:33:16.526Z",
         match response.error_for_status() {
             Ok(response) => {
                 let mut page_projects: Vec<Project> = response.json().await?;
                 if page_projects.is_empty() {
+                    println!("Projects page {:?} is empty", page);
                     break;
                 }
 
+                 if  &page_projects[0].created_at.parse::<DateTime<Utc>>().expect("failed to parse json created_at") > last_pull {
+                         println!("have latest");
+                                     break;
+                          }
+                 println!("Found projects page {:?}", page);
                 projects.append(&mut page_projects);
                 page += 1;
             }
@@ -67,7 +77,7 @@ pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
         [groups]
     }.into();
     for repo in projects {
-
+        println!("found repo {:?}", repo);
 
         // if project_is_cloned_local(repo) {
         //     continue;
@@ -87,8 +97,11 @@ pub async fn sparse_clone_projects(projects: Vec<GitRepo>) {
         // write to ALL config
         if let Some(groups) = config.get_mut("groups") {
             if let Some(table) = groups.as_table_mut() {
+
                 let group = &repo.slug;
                 let project = &repo.repo_name;
+
+
                 table.entry(group).or_insert(Value::Array(vec![]));
                 table.get_mut(group).expect("we just put it there").as_array_mut().expect("we put an array").push(Value::String(project.to_string()));
             } else {

@@ -11,6 +11,7 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::process::Command;
 use std::sync::Arc;
+use chrono::{DateTime,Utc};
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use skim::{Skim, SkimItem, SkimItemReceiver, SkimItemSender, SkimOptions};
@@ -129,15 +130,23 @@ async fn main() {
             if args.gitlab {
                 dotenv().ok(); // Load environment variables from .env file
                 let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
-                
+
                 let config: SettingsConfig = toml::from_str(&fs::read_to_string(config_path)
                     .expect("Failed to SettingsConfig config file")).expect("Failed to parse SettingsConfig file");
+
+
                 let host = config.remotes.keys().next().expect("it to work"); // defaulting to one host
+                //ISO 8601.
+                let last_pull = &config.remotes.get(host)
+                .expect("it to work").last_pull.parse::<DateTime<Utc>>()
+                .expect("failed to parse datetime");
+
                 let gitlab_api_url = &config.remotes.get(host).expect("it to work").gitlab_api_url;
                 let token_env_location = &config.remotes.get(host).expect("it to work").token;
-                let private_token = env::var(&token_env_location).expect("can't find token");
+                let private_token = env::var(&token_env_location)
+                    .expect(&format!("can't find token {}", &token_env_location));
                 let squad = config.remotes.get(host).unwrap().watch_groups.join(",");
-                let projects = get_all_projects(gitlab_api_url, &private_token).await.unwrap();
+                let projects = get_all_projects(gitlab_api_url, &private_token, last_pull).await.unwrap();
                 let repos = project_to_repo(projects);
                 sparse_clone_projects(repos).await;
             }
