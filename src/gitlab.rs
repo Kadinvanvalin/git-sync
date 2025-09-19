@@ -32,9 +32,9 @@ pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str, last_pu
                     println!("Projects page {:?} is empty", page);
                     break;
                 }
-
-                 if  &page_projects[0].created_at.parse::<DateTime<Utc>>().expect("failed to parse json created_at") > last_pull {
-                         println!("have latest {:?} ",  url);
+                let created_at = &page_projects[0].created_at.parse::<DateTime<Utc>>().expect("failed to parse json created_at");
+                 if  created_at > last_pull {
+                         println!("have latest {:?} created_at: {:?}, last_pull: {:?} ",  url,created_at, last_pull );
                                      break;
                           }
                  println!("Found projects page {:?}", page);
