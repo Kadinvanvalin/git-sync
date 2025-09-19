@@ -26,6 +26,7 @@ pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str, last_pu
             // response with    "created_at": "2025-08-20T00:33:16.526Z",
         match response.error_for_status() {
             Ok(response) => {
+             let url = response.url().clone();
                 let mut page_projects: Vec<Project> = response.json().await?;
                 if page_projects.is_empty() {
                     println!("Projects page {:?} is empty", page);
@@ -33,7 +34,7 @@ pub async fn get_all_projects(gitlab_api_url: &str, private_token: &str, last_pu
                 }
 
                  if  &page_projects[0].created_at.parse::<DateTime<Utc>>().expect("failed to parse json created_at") > last_pull {
-                         println!("have latest");
+                         println!("have latest {:?} ",  url);
                                      break;
                           }
                  println!("Found projects page {:?}", page);
