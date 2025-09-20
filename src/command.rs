@@ -1,5 +1,4 @@
-use std::process::{Command};
-
+use std::process::Command;
 
 pub trait CommandExecutor {
     fn run_command(&self, command: &str, args: &str) -> String;
@@ -9,14 +8,13 @@ pub trait CommandExecutor {
 pub struct RealCommandExecutor;
 
 impl CommandExecutor for RealCommandExecutor {
- 
-
-
     fn command_success(&self, command: &str, args: &str) -> bool {
         Command::new(command)
             .args(args.split(" "))
             .output()
-            .expect("failed to call command").status.success()
+            .expect("failed to call command")
+            .status
+            .success()
     }
 
     fn run_command(&self, command: &str, args: &str) -> String {
@@ -25,17 +23,11 @@ impl CommandExecutor for RealCommandExecutor {
             .output()
             .expect("failed to call command");
 
-
         match output.status.success() {
-            true => {
-                Ok(String::from_utf8_lossy(&output.stdout).to_string())
-            },
-            false => {
-                Err(&output.stderr)
-            }
-        }.expect(&format!("Failed to execute command: {} {}",
-                          command,
-                          args))
+            true => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
+            false => Err(&output.stderr),
+        }
+        .expect(&format!("Failed to execute command: {} {}", command, args))
     }
 
     fn run_explicit_command(&self, command: &str, args: Vec<&str>) -> String {
@@ -44,36 +36,39 @@ impl CommandExecutor for RealCommandExecutor {
             .output()
             .expect("failed to call command");
 
-
         match output.status.success() {
-            true => {
-                Ok(String::from_utf8_lossy(&output.stdout).to_string())
-            },
-            false => {
-                Err(&output.stderr)
-            }
-        }.expect(&format!("Failed to execute command: {} {:?}",
-                          command,
-                          args))
+            true => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
+            false => Err(&output.stderr),
+        }
+        .expect(&format!(
+            "Failed to execute command: {} {:?}",
+            command, args
+        ))
     }
 }
-
-
 
 pub struct DebugCommandExecutor;
 
 impl CommandExecutor for DebugCommandExecutor {
     fn run_command(&self, command: &str, args: &str) -> String {
         println!("DEBUG: Simulating execution of `{} {}`", command, args);
+        if command == "git" {
+            if args == "remote get-url origin" {
+                return "git@github.com:meatlore/git-remote.git".parse().unwrap();
+            }
+        }
         "mocked output".to_string()
     }
 
     fn command_success(&self, command: &str, args: &str) -> bool {
-        println!("DEBUG: Pretending `{}` with args `{}` succeeded", command, args);
+        println!(
+            "DEBUG: Pretending `{}` with args `{}` succeeded",
+            command, args
+        );
         true // Always return success during debug mode
     }
 
-    fn run_explicit_command(&self, command: &str, args:Vec<&str> ) -> String {
+    fn run_explicit_command(&self, command: &str, args: Vec<&str>) -> String {
         todo!()
     }
 }
