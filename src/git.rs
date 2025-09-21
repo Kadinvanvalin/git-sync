@@ -36,12 +36,13 @@ pub trait Git {
     fn sync_projects(&self, projects: Vec<GitRepo>) -> ();
     fn commit(&self, message: &str) -> Result<(), String>;
     fn status(&self) -> Result<String, String>;
-    fn remote(&self) -> String;
+    fn remote(&self) -> ();
     fn push(&self) -> ();
     fn clone_repo(&self, repo: &GitRepo) -> ();
+    fn get_remote_url(&self) -> String;
 }
 
-use crate::command::CommandExecutor;
+use crate::command_executor::CommandExecutor;
 use crate::dolly::{make_url, valid_ssh_url, GitRepo};
 
 pub struct RealGit<'a> {
@@ -64,7 +65,6 @@ impl<'a> Git for RealGit<'a> {
     }
 
     fn clone_repo(&self, repo: &GitRepo) -> () {
-        // Maybe we want it to be clone/sync? maybe seperate
         let home_dir = dirs::home_dir().unwrap();
         self.executor.run_command(
             "mkdir",
@@ -92,8 +92,15 @@ impl<'a> Git for RealGit<'a> {
         println!("Pushing: {}", stdout)
     }
 
-    fn remote(&self) -> String {
-        let url = self.executor.run_command("git", "remote get-url origin");
+    fn remote(&self) -> () {
+        self
+            .executor
+            .run_command("open", self.get_remote_url().as_str());
+    }
+    fn get_remote_url(&self) -> String {
+        let url = self
+            .executor
+            .run_command("git", "remote get-url origin");
 
         if valid_ssh_url(&*url) {
             make_url(&url)

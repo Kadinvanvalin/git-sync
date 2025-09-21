@@ -1,10 +1,10 @@
-mod command;
+mod command_executor;
 mod dolly;
 mod git;
 mod gitlab;
 
-use crate::command::DebugCommandExecutor;
-use crate::command::RealCommandExecutor;
+use crate::command_executor::DebugCommandExecutor;
+use crate::command_executor::RealCommandExecutor;
 use crate::dolly::{parse_url, project_to_repo, GitRepo};
 use crate::git::{Git, Projects, RealGit, SettingsConfig};
 use crate::gitlab::{get_all_projects, sparse_clone_projects};
@@ -31,16 +31,21 @@ struct CommitMessage {
 /// Point it at a directory (or read from a config), and it will discover repositories, check for uncommitted changes, and run the appropriate Git operations (pull/push/fetch) across them.
 /// It favors safety (dry-run by default, dirty-tree guards) and clarity (one compact report at the end), so you can automate daily updates without surprises.
 #[derive(Subcommand)]
-#[command(version, about, long_about = None)]
+#[command(version)]
 enum Commands {
+    #[command(about= "true status - git fetch and status")]
     Status,
+    #[command(about= "you probably want to pull first? yeah, we are doing that for you")]
     Commit(CommitMessage),
+    #[command(about= "opens the repo in browser")]
     Remote,
-    // Syncs the list of projects from your remote to local for faster project search
+    #[command(about= "gets all new projects from gitlab and puts in a toml for faster search")]
     Sync,
-    // Lists projects for quicker clone and/or remote viewing
+    #[command(about= "list of all projects gits knows about - so you can remote or clone them directly")]
     List,
+    #[command(about= "git pull on all watched projects")]
     SyncWatched,
+    #[command(about= "doesnt do anything useful")]
     Prototype,
 }
 enum ProjectOptions {
@@ -65,8 +70,7 @@ pub struct App {
     // Enable debug logging (repeat for more verbosity)
     #[arg(short, long, action)]
     dryrun: bool,
-    #[arg(short, long, action)]
-    gitlab: bool,
+    // outputs to stdout instead of opening in browser.
     #[arg(short, long, action)]
     output: bool,
 }
@@ -95,18 +99,9 @@ async fn main() {
         }
         Commands::Remote => {
             if args.output {
-                print!("{}", git.remote());
+               git.get_remote_url();
             } else {
-                if args.dryrun {
-                    println!("DRY RUN:: command open remote {:?}", git.remote().as_str())
-                } else {
-                    Command::new("open")
-                        .arg(git.remote().as_str())
-                        .output()
-                        .expect(
-                            format!("Failed to open remote  {:?}", git.remote().as_str()).as_str(),
-                        );
-                }
+                git.remote();
             }
         }
         Commands::SyncWatched => {
@@ -146,7 +141,6 @@ async fn main() {
         }
         Commands::Sync => {
             // skim with all remotes? autopick if only one?
-            if args.gitlab {
                 dotenv().ok(); // Load environment variables from .env file
                 let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
 
@@ -175,7 +169,6 @@ async fn main() {
                     .unwrap();
                 let repos = project_to_repo(projects);
                 sparse_clone_projects(repos).await;
-            }
         }
         Commands::List => {
             let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
@@ -307,7 +300,6 @@ fn view_projects(git: &RealGit, host: &str) {
             println!("trying to CD!!");
             git.clone_repo(&repo);
             add_to_watched_projects(&repo)
-            //print!("TODO: idk if its worth it because I can't cd to the location? {}", &format!("https://{}/{}/{}", repo.host, repo.slug, repo.repo_name));
         }
         _ => {}
     }
