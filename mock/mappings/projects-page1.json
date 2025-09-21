@@ -1,0 +1,39 @@
+{
+  "scenarioName": "projects paging",
+  "requiredScenarioState": "Started",
+  "newScenarioState": "Page2",
+  "request": {
+    "method": "GET",
+    "urlPath": "/projects",
+    "queryParameters": {
+      "per_page": { "equalTo": "100" },
+      "page": { "equalTo": "1" },
+      "order_by": { "equalTo": "created_at" },
+      "sort": { "equalTo": "desc" }
+    },
+    "headers": { "Private-Token": { "matches": ".*" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Page": "1",
+      "X-Per-Page": "100",
+      "X-Total-Pages": "3",
+      "X-Next-Page": "2"
+    },
+    "jsonBody": [
+      { "id": 1,
+        "created_at": "2025-08-20T00:33:16.526Z",
+        "ssh_url_to_repo": "git@mock:widgetgroup/alpha.git"
+      },
+      { "id": 2,
+        "created_at": "2025-08-20T00:33:16.526Z",
+        "ssh_url_to_repo": "git@mock:widgetgroup/beta.git"
+      },
+      { "id": 3,
+        "created_at": "2025-08-15T14:12:03.000Z",
+        "ssh_url_to_repo": "git@mock:flimflam/beta.git" }
+    ]
+  }
+}

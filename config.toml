@@ -1,6 +1,7 @@
-[remotes.gitlab]
-token="env var where private token is"
-project_directory="localhost"
-gitlab_api_url="http://localhost"
-watch_groups=[]
-watch_projects=[]
+[remotes.mock]
+token = "MOCK_TOKEN"
+gitlab_api_url = "http://localhost:8080"
+project_directory = "tmp/mock"
+watch_groups = []
+watch_projects = []
+last_pull="1582-10-16T00:00:00.000Z"

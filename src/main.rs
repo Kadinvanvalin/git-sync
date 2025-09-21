@@ -4,6 +4,7 @@ mod dolly;
 mod git;
 mod gitlab;
 mod list;
+mod github;
 
 use crate::command_executor::DebugCommandExecutor;
 use crate::command_executor::RealCommandExecutor;
@@ -103,15 +104,9 @@ async fn main() {
         Commands::Sync => {
             dotenv().ok(); // Load environment variables from .env file
 
-            let projects = get_all_projects(
-                &*config.get_gitlab_api_url(),
-                &*config.get_private_token(),
-                &config.get_last_sync(),
-            )
-            .await
-            .unwrap();
-            let repos = project_to_repo(projects);
-            repos.iter().for_each(|repo| config.add_to_global(repo));
+            let repos = config.get_repos();
+           
+            repos.iter().for_each(|repo| config.add_to_inventory(repo));
         }
         Commands::List => {
             list::view_projects(&git, &config);

@@ -1,0 +1,27 @@
+{
+  "scenarioName": "projects paging",
+  "requiredScenarioState": "Page3",
+  "newScenarioState": "Page4",
+  "request": {
+    "method": "GET",
+    "urlPath": "/projects",
+    "queryParameters": {
+      "per_page": { "matches": ".*" },
+      "page": { "equalTo": "3" },
+      "order_by": { "equalTo": "created_at" },
+      "sort": { "equalTo": "desc" }
+    },
+    "headers": { "Private-Token": { "matches": ".*" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Page": "3",
+      "X-Per-Page": "100",
+      "X-Total-Pages": "4",
+      "X-Next-Page": "4"
+    },
+    "jsonBody": []
+  }
+}
