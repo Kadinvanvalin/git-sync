@@ -47,8 +47,6 @@ enum Commands {
     List,
     #[command(about = "git pull on all watched projects")]
     SyncWatched,
-    // #[command(about= "doesnt do anything useful")]
-    // Prototype,
 }
 enum ProjectOptions {
     Remote,
@@ -132,36 +130,7 @@ async fn main() {
         }
         Commands::List => {
             view_projects(&git, &config);
-        } // Commands::Prototype => {
-          //     let input_items = vec!["Option 1", "Option 2", "Option 3"];
-          //     let input = input_items.join("\n"); // Create a single input string joined by newlines
-          //
-          //     // Configure skim
-          //     let options = SkimOptionsBuilder::default()
-          //         .prompt("Select an option > ".parse().unwrap()) // Set a custom prompt
-          //         .height("50%".parse().unwrap()) // Restrict height (optional)
-          //         .multi(false) // Disable multi-select
-          //         .build()
-          //         .unwrap();
-          //     let (tx, rx): (SkimItemSender, SkimItemReceiver) = skim::prelude::unbounded();
-          //     // Send items into the channel
-          //     for item in input_items {
-          //         tx.send(Arc::new(item.to_string())).unwrap(); // Wrap each item in Arc<String>
-          //     }
-          //     drop(tx); // Close the sender so skim knows no more items will be sent
-          //
-          //     // Run skim
-          //     let selected_items = Skim::run_with(&options, Some(rx))
-          //         .map(|out| out.selected_items) // Get selected items
-          //         .unwrap_or_else(|| Vec::new()); // Fallback to empty vector if nothing selected
-          //
-          //     // Process the result
-          //     if let Some(selected_item) = selected_items.get(0) {
-          //         println!("You selected: {}", selected_item.output());
-          //     } else {
-          //         println!("No selection made");
-          //     }
-          // }
+        }
     }
 }
 
