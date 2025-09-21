@@ -53,7 +53,7 @@ mod tests {
     fn convert_works() {
         let projects = vec![git::Project {
             ssh_url_to_repo: "git@gitlab.company.dev:squad/tools/mytool.git".to_string(),
-            path_with_namespace: "".to_string(),
+            created_at: "test".to_string(),
         }];
         let result = project_to_repo(projects);
         assert_eq!(

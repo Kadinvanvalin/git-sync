@@ -1,5 +1,3 @@
-use std::cell::RefCell;
-use rouille::Request;
 use rouille::Response;
 use std::io;
 use serde::{Deserialize, Serialize};

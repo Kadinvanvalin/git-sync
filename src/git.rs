@@ -1,11 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::process::Command;
 
 #[derive(Deserialize, Debug)]
 pub struct Project {
     pub ssh_url_to_repo: String,
-    pub path_with_namespace: String,
     pub created_at: String,
 }
 
@@ -33,7 +31,6 @@ pub struct Group {
     projects: Vec<String>,
 }
 pub trait Git {
-    fn sync_projects(&self, projects: Vec<GitRepo>) -> ();
     fn commit(&self, message: &str) -> Result<(), String>;
     fn status(&self) -> Result<String, String>;
     fn remote(&self) -> ();
@@ -56,14 +53,6 @@ impl<'a> RealGit<'a> {
 }
 
 impl<'a> Git for RealGit<'a> {
-    fn sync_projects(&self, projects: Vec<GitRepo>) {
-        print!("{:?}", &projects);
-        for repo in projects {
-            // need to sync if already cloned, or clone if we cant fetch?
-            self.clone_repo(&repo);
-        }
-    }
-
     fn clone_repo(&self, repo: &GitRepo) -> () {
         let home_dir = dirs::home_dir().unwrap();
         self.executor.run_command(
@@ -93,14 +82,11 @@ impl<'a> Git for RealGit<'a> {
     }
 
     fn remote(&self) -> () {
-        self
-            .executor
+        self.executor
             .run_command("open", self.get_remote_url().as_str());
     }
     fn get_remote_url(&self) -> String {
-        let url = self
-            .executor
-            .run_command("git", "remote get-url origin");
+        let url = self.executor.run_command("git", "remote get-url origin");
 
         if valid_ssh_url(&*url) {
             make_url(&url)

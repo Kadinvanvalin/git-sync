@@ -1,26 +1,25 @@
 mod command_executor;
+mod config;
 mod dolly;
 mod git;
 mod gitlab;
 
 use crate::command_executor::DebugCommandExecutor;
 use crate::command_executor::RealCommandExecutor;
-use crate::dolly::{parse_url, project_to_repo, GitRepo};
-use crate::git::{Git, Projects, RealGit, SettingsConfig};
-use crate::gitlab::{get_all_projects, sparse_clone_projects};
-use chrono::{DateTime, Utc};
+use crate::config::{GitsConfig, RealGitsConfig};
+use crate::dolly::{parse_url, project_to_repo};
+use crate::git::{Git, RealGit};
+use crate::gitlab::get_all_projects;
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use skim::options::SkimOptionsBuilder;
-use skim::{Skim, SkimItem, SkimItemReceiver, SkimItemSender, SkimOptions};
+use skim::{Skim, SkimItem, SkimItemReceiver, SkimItemSender};
 use std::borrow::Cow;
-use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
-use std::{env, fs};
-use toml::Value;
+
 #[derive(Args, Debug)]
 struct CommitMessage {
     #[clap(trailing_var_arg = true)]
@@ -30,26 +29,28 @@ struct CommitMessage {
 /// git-sync keeps lots of Git repos up to date with one command.
 /// Point it at a directory (or read from a config), and it will discover repositories, check for uncommitted changes, and run the appropriate Git operations (pull/push/fetch) across them.
 /// It favors safety (dry-run by default, dirty-tree guards) and clarity (one compact report at the end), so you can automate daily updates without surprises.
+/// you can think of repos as branches - fetch gets all new repos, pull pulls everything
 #[derive(Subcommand)]
 #[command(version)]
 enum Commands {
-    #[command(about= "true status - git fetch and status")]
+    #[command(about = "true status - git fetch and status")]
     Status,
-    #[command(about= "you probably want to pull first? yeah, we are doing that for you")]
+    #[command(about = "you probably want to pull first? yeah, we are doing that for you")]
     Commit(CommitMessage),
-    #[command(about= "opens the repo in browser")]
+    #[command(about = "opens the repo in browser")]
     Remote,
-    #[command(about= "gets all new projects from gitlab and puts in a toml for faster search")]
+    #[command(about = "gets all new projects from gitlab and puts in a toml for faster search")]
     Sync,
-    #[command(about= "list of all projects gits knows about - so you can remote or clone them directly")]
+    #[command(
+        about = "list of all projects gits knows about - so you can remote or clone them directly"
+    )]
     List,
-    #[command(about= "git pull on all watched projects")]
+    #[command(about = "git pull on all watched projects")]
     SyncWatched,
-    #[command(about= "doesnt do anything useful")]
-    Prototype,
+    // #[command(about= "doesnt do anything useful")]
+    // Prototype,
 }
 enum ProjectOptions {
-    Readme,
     Remote,
     Clone,
 }
@@ -57,7 +58,6 @@ enum ProjectOptions {
 impl SkimItem for ProjectOptions {
     fn text(&self) -> Cow<str> {
         match self {
-            ProjectOptions::Readme => Cow::Borrowed("Readme"),
             ProjectOptions::Remote => Cow::Borrowed("Remote"),
             ProjectOptions::Clone => Cow::Borrowed("Clone"),
         }
@@ -85,7 +85,7 @@ async fn main() {
     } else {
         RealGit::new(&RealCommandExecutor)
     };
-
+    let config: RealGitsConfig = GitsConfig::build();
     match args.cmd {
         Commands::Status => {
             let status = git.status().expect("TODO: panic message");
@@ -99,131 +99,73 @@ async fn main() {
         }
         Commands::Remote => {
             if args.output {
-               git.get_remote_url();
+                git.get_remote_url();
             } else {
                 git.remote();
             }
         }
         Commands::SyncWatched => {
-            let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
-            let config: SettingsConfig = toml::from_str(
-                &fs::read_to_string(config_path).expect("Failed to SettingsConfig config file"),
-            )
-            .expect("Failed to parse SettingsConfig file");
-            let host = config.remotes.keys().next().expect("it to work"); // defaulting to one host
-            let groups_path = dirs::home_dir()
-                .unwrap()
-                .join(format!(".config/gits/{}-watched.toml", host));
-            let projects = toml::from_str::<Projects>(
-                &fs::read_to_string(groups_path).expect("Failed to read projects file"),
-            )
-            .expect("Failed to parse projects file")
-            .groups;
-            for (slug, group) in &projects {
-                for project in group {
-                    let repo = GitRepo {
-                        slug: slug.to_string(),
-                        repo_name: project.to_string(),
-                        host: host.to_string(),
-                    };
-                    //.git/FETCH_HEAD
-                    let fetch_head_path = dirs::home_dir().unwrap().join(format!(
-                        "{}/{}/{}/.git",
-                        repo.host, repo.slug, repo.repo_name
-                    ));
-                    // maybe check if dir exists and delete if not a repo? idk
-                    if !Path::new(&fetch_head_path).is_dir() {
-                        println!("cloning {:?}", repo);
-                        git.clone_repo(&repo);
-                    }
+            config.get_repos().iter().for_each(|repo| {
+                let fetch_head_path = dirs::home_dir().unwrap().join(format!(
+                    "{}/{}/{}/.git",
+                    repo.host, repo.slug, repo.repo_name
+                ));
+                // maybe check if dir exists and delete if not a repo? idk
+                if !Path::new(&fetch_head_path).is_dir() {
+                    println!("cloning {:?}", repo);
+                    git.clone_repo(&repo);
                 }
-            }
+            });
         }
         Commands::Sync => {
-            // skim with all remotes? autopick if only one?
-                dotenv().ok(); // Load environment variables from .env file
-                let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
+            dotenv().ok(); // Load environment variables from .env file
 
-                let config: SettingsConfig = toml::from_str(
-                    &fs::read_to_string(config_path).expect("Failed to SettingsConfig config file"),
-                )
-                .expect("Failed to parse SettingsConfig file");
-
-                let host = config.remotes.keys().next().expect("it to work"); // defaulting to one host
-                                                                              //ISO 8601.
-                let last_pull = &config
-                    .remotes
-                    .get(host)
-                    .expect("it to work")
-                    .last_pull
-                    .parse::<DateTime<Utc>>()
-                    .expect("failed to parse datetime");
-
-                let gitlab_api_url = &config.remotes.get(host).expect("it to work").gitlab_api_url;
-                let token_env_location = &config.remotes.get(host).expect("it to work").token;
-                let private_token = env::var(&token_env_location)
-                    .expect(&format!("can't find token {}", &token_env_location));
-                let squad = config.remotes.get(host).unwrap().watch_groups.join(",");
-                let projects = get_all_projects(gitlab_api_url, &private_token, last_pull)
-                    .await
-                    .unwrap();
-                let repos = project_to_repo(projects);
-                sparse_clone_projects(repos).await;
+            let projects = get_all_projects(
+                &*config.get_gitlab_api_url(),
+                &*config.get_private_token(),
+                &config.get_last_sync(),
+            )
+            .await
+            .unwrap();
+            let repos = project_to_repo(projects);
+            repos.iter().for_each(|repo| config.add_to_global(repo));
         }
         Commands::List => {
-            let config_path = dirs::home_dir().unwrap().join(".config/gits/config.toml");
-            let config: SettingsConfig = toml::from_str(
-                &fs::read_to_string(config_path).expect("Failed to SettingsConfig config file"),
-            )
-            .expect("Failed to parse SettingsConfig file");
-            let host = config.remotes.keys().next().expect("it to work"); // defaulting to one host
-                                                                          // skim with all remotes? autopick if only one?
-                                                                          // maybe load ALL?
-            view_projects(&git, host);
-        }
-        Commands::Prototype => {
-            let input_items = vec!["Option 1", "Option 2", "Option 3"];
-            let input = input_items.join("\n"); // Create a single input string joined by newlines
-
-            // Configure skim
-            let options = SkimOptionsBuilder::default()
-                .prompt("Select an option > ".parse().unwrap()) // Set a custom prompt
-                .height("50%".parse().unwrap()) // Restrict height (optional)
-                .multi(false) // Disable multi-select
-                .build()
-                .unwrap();
-            let (tx, rx): (SkimItemSender, SkimItemReceiver) = skim::prelude::unbounded();
-            // Send items into the channel
-            for item in input_items {
-                tx.send(Arc::new(item.to_string())).unwrap(); // Wrap each item in Arc<String>
-            }
-            drop(tx); // Close the sender so skim knows no more items will be sent
-
-            // Run skim
-            let selected_items = Skim::run_with(&options, Some(rx))
-                .map(|out| out.selected_items) // Get selected items
-                .unwrap_or_else(|| Vec::new()); // Fallback to empty vector if nothing selected
-
-            // Process the result
-            if let Some(selected_item) = selected_items.get(0) {
-                println!("You selected: {}", selected_item.output());
-            } else {
-                println!("No selection made");
-            }
-        }
+            view_projects(&git, &config);
+        } // Commands::Prototype => {
+          //     let input_items = vec!["Option 1", "Option 2", "Option 3"];
+          //     let input = input_items.join("\n"); // Create a single input string joined by newlines
+          //
+          //     // Configure skim
+          //     let options = SkimOptionsBuilder::default()
+          //         .prompt("Select an option > ".parse().unwrap()) // Set a custom prompt
+          //         .height("50%".parse().unwrap()) // Restrict height (optional)
+          //         .multi(false) // Disable multi-select
+          //         .build()
+          //         .unwrap();
+          //     let (tx, rx): (SkimItemSender, SkimItemReceiver) = skim::prelude::unbounded();
+          //     // Send items into the channel
+          //     for item in input_items {
+          //         tx.send(Arc::new(item.to_string())).unwrap(); // Wrap each item in Arc<String>
+          //     }
+          //     drop(tx); // Close the sender so skim knows no more items will be sent
+          //
+          //     // Run skim
+          //     let selected_items = Skim::run_with(&options, Some(rx))
+          //         .map(|out| out.selected_items) // Get selected items
+          //         .unwrap_or_else(|| Vec::new()); // Fallback to empty vector if nothing selected
+          //
+          //     // Process the result
+          //     if let Some(selected_item) = selected_items.get(0) {
+          //         println!("You selected: {}", selected_item.output());
+          //     } else {
+          //         println!("No selection made");
+          //     }
+          // }
     }
 }
 
-fn view_projects(git: &RealGit, host: &str) {
-    let groups_path = dirs::home_dir()
-        .unwrap()
-        .join(format!(".config/gits/{}.toml", host));
-    let projects = toml::from_str::<Projects>(
-        &fs::read_to_string(groups_path).expect("Failed to read projects file"),
-    )
-    .expect("Failed to parse projects file")
-    .groups;
-
+fn view_projects(git: &RealGit, config: &RealGitsConfig) {
     let options = SkimOptionsBuilder::default()
         .prompt("Select an option > ".parse().unwrap()) // Set a custom prompt
         .height("50%".parse().unwrap()) // Restrict height (optional)
@@ -232,7 +174,7 @@ fn view_projects(git: &RealGit, host: &str) {
         .unwrap();
     let (tx, rx): (SkimItemSender, SkimItemReceiver) = skim::prelude::unbounded();
 
-    for (slug, group) in &projects {
+    for (slug, group) in &config.get_projects() {
         for project in group {
             tx.send(Arc::new(slug.clone() + "/" + project))
                 .expect("TODO: panic message");
@@ -251,7 +193,7 @@ fn view_projects(git: &RealGit, host: &str) {
         .iter()
         .map(|item| item.output())
         .collect::<Vec<_>>();
-    let repo = parse_url(&format!("git@{}:{}.git", host, binding[0]));
+    let repo = parse_url(&format!("git@{}:{}.git", config.host, binding[0]));
 
     println!("{:?}", repo);
 
@@ -273,16 +215,6 @@ fn view_projects(git: &RealGit, host: &str) {
     print!("selectedCommand: {}", selected_command.text());
 
     match selected_command.text().as_ref() {
-        "Readme" => {
-            print!("TODO multiple readme names");
-            Command::new("open")
-                .arg(&format!(
-                    "https://{}/{}/{}{}",
-                    repo.host, repo.slug, repo.repo_name, "/blob/master/README.md"
-                ))
-                .output()
-                .expect("TODO: panic message");
-        }
         "Remote" => {
             print!(
                 "opening remote {}",
@@ -299,54 +231,8 @@ fn view_projects(git: &RealGit, host: &str) {
         "Clone" => {
             println!("trying to CD!!");
             git.clone_repo(&repo);
-            add_to_watched_projects(&repo)
+            config.add_to_global(&repo)
         }
         _ => {}
     }
-}
-
-pub fn add_to_watched_projects(git_repo: &GitRepo) {
-    let config_path = dirs::home_dir()
-        .unwrap()
-        .join(format!(".config/gits/{}-watched.toml", git_repo.host));
-    let mut config: Value = toml::from_str(
-        &fs::read_to_string(&config_path).unwrap_or_else(|_| "[groups]\nprojects = []".to_string()),
-    )
-    .expect("Failed to parse config file");
-
-    if let Some(groups) = config.get_mut("groups") {
-        if let Some(table) = groups.as_table_mut() {
-            let group = &git_repo.slug;
-            let project = &git_repo.repo_name;
-            table.entry(group).or_insert(Value::Array(vec![]));
-            table
-                .get_mut(group)
-                .expect("we just put it there")
-                .as_array_mut()
-                .expect("we put an array")
-                .push(Value::String(project.to_string()));
-            table
-                .get_mut(group)
-                .expect("we just put it there")
-                .as_array_mut()
-                .unwrap()
-                .dedup();
-        } else {
-            eprintln!("Error mut toml config",);
-        }
-        print!("final config: {:?}", &config);
-    }
-
-    let mut file = OpenOptions::new()
-        .write(true)
-        .create(true)
-        .truncate(true)
-        .open(&config_path)
-        .expect("Failed to open config file");
-    file.write_all(
-        toml::to_string(&config)
-            .expect("Failed to serialize config")
-            .as_bytes(),
-    )
-    .expect("Failed to write config file");
 }

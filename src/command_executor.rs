@@ -8,15 +8,6 @@ pub trait CommandExecutor {
 pub struct RealCommandExecutor;
 
 impl CommandExecutor for RealCommandExecutor {
-    fn command_success(&self, command: &str, args: &str) -> bool {
-        Command::new(command)
-            .args(args.split(" "))
-            .output()
-            .expect("failed to call command")
-            .status
-            .success()
-    }
-
     fn run_command(&self, command: &str, args: &str) -> String {
         let output = Command::new(command)
             .args(args.split(" "))
@@ -28,6 +19,15 @@ impl CommandExecutor for RealCommandExecutor {
             false => Err(&output.stderr),
         }
         .expect(&format!("Failed to execute command: {} {}", command, args))
+    }
+
+    fn command_success(&self, command: &str, args: &str) -> bool {
+        Command::new(command)
+            .args(args.split(" "))
+            .output()
+            .expect("failed to call command")
+            .status
+            .success()
     }
 
     fn run_explicit_command(&self, command: &str, args: Vec<&str>) -> String {
@@ -68,7 +68,7 @@ impl CommandExecutor for DebugCommandExecutor {
         true // Always return success during debug mode
     }
 
-    fn run_explicit_command(&self, command: &str, args: Vec<&str>) -> String {
+    fn run_explicit_command(&self, _command: &str, _args: Vec<&str>) -> String {
         todo!()
     }
 }
