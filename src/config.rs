@@ -128,7 +128,7 @@ impl GitsConfig for RealGitsConfig {
             .token
             .clone();
 
-        env::var(token_env_location).expect("can't find auth token")
+        env::var(token_env_location).unwrap_or_default()
     }
 
     fn get_last_sync(&self, host: Host) -> DateTime<Utc> {
