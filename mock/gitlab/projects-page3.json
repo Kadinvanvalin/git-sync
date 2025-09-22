@@ -1,7 +1,7 @@
 {
   "scenarioName": "projects paging",
   "requiredScenarioState": "Page3",
-  "newScenarioState": "Page4",
+  "newScenarioState": "Started",
   "request": {
     "method": "GET",
     "urlPath": "/projects",

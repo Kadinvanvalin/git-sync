@@ -4,7 +4,7 @@ use chrono::{DateTime, Utc};
 use reqwest::Client;
 use std::fs;
 
-pub async fn get_all_projects(
+pub async fn get_all_gitlab_projects(
     gitlab_api_url: &str,
     private_token: &str,
     last_pull: &DateTime<Utc>,

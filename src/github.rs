@@ -19,26 +19,52 @@
 use crate::git::Project;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
+use reqwest::header::HeaderMap;
+use rouille::url::quirks::host;
+use serde::Deserialize;
 
-// pub async fn get_all_projects(
-//     gitlab_api_url: &str,
-//     private_token: &str,
-//     last_pull: &DateTime<Utc>,
-// ) -> Result<Vec<Project>, reqwest::Error> {
-//     let client = Client::new();
-//     let mut projects = Vec::new();
-//     let mut page = 1;
-//     loop {
-//         print!("Fetching page {}...", page);
-//         let response = client
-//             .get(format!("{}/projects", gitlab_api_url))
-//             .header("Private-Token", private_token)
-//             .query(&[
-//                 ("per_page", "100"),
-//                 ("page", &page.to_string()),
-//                 ("order_by", "created_at"),
-//                 ("sort", "desc"),
-//             ])
-//             .send()
-//             .await?;
-//     }
+#[derive(Deserialize, Debug)]
+pub struct GitHubResponse {
+    full_name: String,
+    created_at: String,
+}
+pub async fn get_watched_github_projects(
+    api_url: &str,
+    private_token: &str,
+    last_pull: &DateTime<Utc>,
+    user: String,
+) -> Result<Vec<Project>, reqwest::Error> {
+    let client = Client::new();
+    let mut projects: Vec<Project> = Vec::new();
+    
+    
+    
+        // / -H "Accept: application/vnd.github+json" \
+        // // -H "Authorization: Bearer <YOUR-TOKEN>" \
+        // // -H "X-GitHub-Api-Version: 2022-11-28" \
+        let response = client
+            .get(format!("{}/users/{}/repos", api_url, user))
+            .header("Authorization", format!("Bearer: {}", private_token))
+            .header("X-GitHub-Api-Version", "2022-11-28")
+            .header("Accept", "application/vnd.github+json")
+            .send()
+            .await?;
+        match response.error_for_status() {
+            Ok(response) => {
+                let url = response.url().clone();
+                let  page_projects: Vec<GitHubResponse> = response.json().await?;
+                page_projects.iter().for_each(|project| {
+                    let host = "github.com";
+                    projects.push( Project {
+                        ssh_url_to_repo: format!("git@{}:{}.git", host, project.full_name.clone()),
+                        created_at: project.created_at.clone(),
+                    });
+                })
+            }
+            Err(e) => {
+                println!("Check vpn connection? {:?}", e);
+                return Err(e);
+            }
+        }
+    Ok(projects)
+}

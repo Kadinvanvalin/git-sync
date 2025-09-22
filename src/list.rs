@@ -97,7 +97,7 @@ pub fn view_projects(git: &RealGit, config: &RealGitsConfig) {
                 "Clone" => {
                     println!("trying to CD!!");
                     git.clone_repo(&repo);
-                    config.add_to_inventory(&repo)
+                    config.add_to_inventory(&repo).unwrap();
                 }
                 other => panic!("unknown action: {other}"),
             },

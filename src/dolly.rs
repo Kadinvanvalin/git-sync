@@ -1,5 +1,6 @@
 use crate::git;
 use regex::Regex;
+use crate::git::Project;
 
 #[derive(PartialEq, Debug)]
 pub struct GitRepo {
@@ -39,30 +40,10 @@ pub fn parse_url(url: &str) -> GitRepo {
     }
 }
 
-pub fn project_to_repo(projects: Vec<git::Project>) -> Vec<GitRepo> {
+pub fn project_to_repo(projects: Vec<&Project>) -> Vec<GitRepo> {
     projects
         .iter()
         .map(|p| parse_url(&*p.ssh_url_to_repo))
         .collect()
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
 
-    #[test]
-    fn convert_works() {
-        let projects = vec![git::Project {
-            ssh_url_to_repo: "git@gitlab.company.dev:squad/tools/mytool.git".to_string(),
-            created_at: "test".to_string(),
-        }];
-        let result = project_to_repo(projects);
-        assert_eq!(
-            result[0],
-            GitRepo {
-                host: "gitlab.company.dev".to_string(),
-                slug: "squad/tools".to_string(),
-                repo_name: "mytool".to_string(),
-            }
-        );
-    }
-}

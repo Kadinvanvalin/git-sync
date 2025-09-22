@@ -16,14 +16,23 @@ pub struct Projects {
 pub struct SettingsConfig {
     pub remotes: HashMap<String, RemoteSettings>,
 }
+
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")] // maps GitHub -> "github", GitLab -> "gitlab"
+pub enum HostKind {
+    GitHub,
+    GitLab,
+}
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RemoteSettings {
     pub token: String,
     pub project_directory: String,
-    pub gitlab_api_url: String,
+    pub api_url: String,
     pub watch_groups: Vec<String>,
     pub watch_projects: Vec<String>,
     pub last_pull: String,
+    pub host_kind: HostKind,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone)]

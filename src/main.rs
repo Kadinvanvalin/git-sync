@@ -9,15 +9,18 @@ mod github;
 use crate::command_executor::DebugCommandExecutor;
 use crate::command_executor::RealCommandExecutor;
 use crate::config::{GitsConfig, RealGitsConfig};
-use crate::dolly::project_to_repo;
-use crate::git::{Git, RealGit};
-use crate::gitlab::get_all_projects;
+use crate::dolly::{project_to_repo, GitRepo};
+use crate::git::{Git, HostKind, RealGit};
+use crate::gitlab::get_all_gitlab_projects;
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use skim::SkimItem;
 use std::borrow::Cow;
 use std::io::Write;
 use std::path::Path;
+use chrono::{DateTime, Utc};
+use crate::github::get_watched_github_projects;
+
 #[derive(Args, Debug)]
 struct CommitMessage {
     #[clap(trailing_var_arg = true)]
@@ -103,10 +106,43 @@ async fn main() {
         }
         Commands::Sync => {
             dotenv().ok(); // Load environment variables from .env file
-
-            let repos = config.get_repos();
-           
-            repos.iter().for_each(|repo| config.add_to_inventory(repo));
+            let remotes = config.get_remotes_config().unwrap();
+            let mut repos = Vec::new();
+            
+            for (host, remote_settings) in remotes.remotes {
+                if remote_settings.host_kind == HostKind::GitLab {
+                    let response = get_all_gitlab_projects(
+                        &*remote_settings.api_url,
+                        &*config.get_private_token(host.clone()),
+                        &remote_settings
+                            .last_pull
+                            .parse::<DateTime<Utc>>()
+                            .expect("failed to parse json created_at")
+                    ).await;
+                    repos.push(response.unwrap())
+                }
+                if remote_settings.host_kind == HostKind::GitHub {
+                    let response = get_watched_github_projects(
+                        &*remote_settings.api_url,
+                        &*config.get_private_token(host.clone()),
+                        &remote_settings
+                            .last_pull
+                            .parse::<DateTime<Utc>>()
+                            .expect("failed to parse json created_at"),
+                        "Kadinvanvalin".to_string(),
+                        
+                    ).await;
+                    repos.push(response.unwrap())
+                }
+              
+            }
+            let repos = repos.iter().flatten().collect::<Vec<_>>();
+            let repos = project_to_repo(repos);
+            
+            repos
+                .iter()
+                .for_each(|repo| config.add_to_inventory(repo).unwrap());
+            
         }
         Commands::List => {
             list::view_projects(&git, &config);

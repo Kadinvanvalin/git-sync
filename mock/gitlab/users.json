@@ -1,0 +1,35 @@
+{
+  "scenarioName": "github",
+  "request": {
+    "method": "GET",
+    "urlPathTemplate": "/users/{username}/repos",
+    "pathParameters": {
+      "username": {
+        "equalTo": "Kadinvanvalin"
+      }
+    },
+    "headers": { "Authorization": { "matches": "Bearer: .*" } }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json",
+      "X-Page": "1",
+      "X-Per-Page": "100",
+      "X-Total-Pages": "3",
+      "X-Next-Page": "2"
+    },
+    "jsonBody": [
+      { "id": 1,
+        "created_at": "2025-08-20T00:33:16.526Z",
+        "full_name": "Kadinvanvalin/alpha"
+      },
+      { "id": 2,
+        "created_at": "2025-08-20T00:33:16.526Z",
+        "full_name": "Kadinvanvalin/beta"
+      }
+
+    ]
+  }
+}
+
