@@ -1,4 +1,4 @@
-[remotes.mock]
+[remotes."mock-gitlab"]
 token = "MOCK_TOKEN"
 api_url = "http://localhost:8080"
 host_kind="gitlab"
@@ -6,11 +6,11 @@ project_directory = "tmp/mock"
 watch_groups = []
 watch_projects = []
 last_pull="1582-10-16T00:00:00.000Z"
-[remotes.mock2]
+[remotes."mock-github"]
 token = "MOCK_TOKEN"
 host_kind="github"
 api_url = "http://localhost:8080"
 project_directory = "tmp/mock"
-watch_groups = []
+watch_groups = ["watched_user_name"]
 watch_projects = []
 last_pull="1582-10-16T00:00:00.000Z"

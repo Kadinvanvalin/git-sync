@@ -1,8 +1,6 @@
-use crate::dolly::GitRepo;
-use crate::git::{Project, SettingsConfig};
+use crate::git::Project;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
-use std::fs;
 
 pub async fn get_all_gitlab_projects(
     gitlab_api_url: &str,
@@ -25,8 +23,6 @@ pub async fn get_all_gitlab_projects(
             ])
             .send()
             .await?;
-        //order_by=created_a maybe I can only get new?
-        // response with    "created_at": "2025-08-20T00:33:16.526Z",
         match response.error_for_status() {
             Ok(response) => {
                 let url = response.url().clone();
@@ -58,18 +54,4 @@ pub async fn get_all_gitlab_projects(
     }
 
     Ok(projects)
-}
-fn is_watch_set_in_base_config(repo: &GitRepo) -> bool {
-    let base_config_path = dirs::home_dir()
-        .unwrap()
-        .join(format!(".config/gits/config.toml"));
-
-    let config: SettingsConfig = toml::from_str(
-        &fs::read_to_string(base_config_path).expect("Failed to SettingsConfig config file"),
-    )
-    .expect("Failed to parse SettingsConfig file");
-    let watch_groups = &config.remotes.get(&repo.host).unwrap().watch_groups;
-    let watch_projects = &config.remotes.get(&repo.host).unwrap().watch_projects;
-    watch_groups.contains(&repo.slug)
-        || watch_projects.contains(&format!("{}/{}", repo.slug, repo.repo_name))
 }

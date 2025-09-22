@@ -1,25 +1,23 @@
 mod command_executor;
 mod config;
-mod dolly;
 mod git;
+mod github;
 mod gitlab;
 mod list;
-mod github;
 
 use crate::command_executor::DebugCommandExecutor;
 use crate::command_executor::RealCommandExecutor;
 use crate::config::{GitsConfig, RealGitsConfig};
-use crate::dolly::{project_to_repo, GitRepo};
-use crate::git::{Git, HostKind, RealGit};
+
+use crate::git::{project_to_repo, Git, HostKind, RealGit};
+use crate::github::get_watched_github_projects;
 use crate::gitlab::get_all_gitlab_projects;
+use chrono::{DateTime, Utc};
 use clap::{Args, Parser, Subcommand};
 use dotenv::dotenv;
 use skim::SkimItem;
-use std::borrow::Cow;
 use std::io::Write;
 use std::path::Path;
-use chrono::{DateTime, Utc};
-use crate::github::get_watched_github_projects;
 
 #[derive(Args, Debug)]
 struct CommitMessage {
@@ -108,7 +106,7 @@ async fn main() {
             dotenv().ok(); // Load environment variables from .env file
             let remotes = config.get_remotes_config().unwrap();
             let mut repos = Vec::new();
-            
+
             for (host, remote_settings) in remotes.remotes {
                 if remote_settings.host_kind == HostKind::GitLab {
                     let response = get_all_gitlab_projects(
@@ -117,36 +115,39 @@ async fn main() {
                         &remote_settings
                             .last_pull
                             .parse::<DateTime<Utc>>()
-                            .expect("failed to parse json created_at")
-                    ).await;
-                    repos.push(response.unwrap())
+                            .expect("failed to parse json created_at"),
+                    )
+                    .await;
+                    
+                    repos.push(project_to_repo(response.unwrap()))
                 }
                 if remote_settings.host_kind == HostKind::GitHub {
-                    let response = get_watched_github_projects(
-                        &*remote_settings.api_url,
-                        &*config.get_private_token(host.clone()),
-                        &remote_settings
-                            .last_pull
-                            .parse::<DateTime<Utc>>()
-                            .expect("failed to parse json created_at"),
-                        "Kadinvanvalin".to_string(),
-                        
-                    ).await;
-                    repos.push(response.unwrap())
-                }
-              
+                    for username in remote_settings.watch_groups {
+                        let response = get_watched_github_projects(
+                            &*remote_settings.api_url,
+                            &*config.get_private_token(host.clone()),
+                            &remote_settings
+                                .last_pull
+                                .parse::<DateTime<Utc>>()
+                                .expect("failed to parse json created_at"),
+                            username,
+                            host.clone()
+                        )
+                            .await;
+                        repos.push(response.unwrap())
+                    }     
+                    }
+                   
             }
             let repos = repos.iter().flatten().collect::<Vec<_>>();
-            let repos = project_to_repo(repos);
             
+
             repos
                 .iter()
                 .for_each(|repo| config.add_to_inventory(repo).unwrap());
-            
         }
         Commands::List => {
             list::view_projects(&git, &config);
         }
     }
 }
-

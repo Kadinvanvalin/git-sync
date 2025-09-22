@@ -1,14 +1,11 @@
-use crate::dolly::GitRepo;
+use crate::git::{GitRepo, RemoteSettings};
+use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fs::OpenOptions;
 use std::io::Write;
-use std::{env, fs};
 use std::path::PathBuf;
-use toml::Value;
-use crate::git::{HostKind, RemoteSettings};
-use anyhow::{Context, Result};
+use std::{env, fs};
 
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct InventoryToml {
@@ -16,10 +13,7 @@ struct InventoryToml {
     #[serde(default)]
     groups: InventoryGroups,
 }
-// #[derive(Deserialize, Serialize, Debug)]
-// pub struct InventoryToml {
-//     pub(crate) groups: InventoryGroups,
-// }
+
 type Slug = String;
 type ProjectName = String;
 type Host = String;
@@ -34,33 +28,19 @@ pub trait GitsConfig {
     fn get_last_sync(&self, host: Host) -> DateTime<Utc>;
     fn get_api_url(&self, host: Host) -> String;
 
-    fn add_to_inventory(&self, git_repo: &GitRepo) ->  Result<()>;
+    fn add_to_inventory(&self, git_repo: &GitRepo) -> Result<()>;
     fn get_remotes_config(&self) -> anyhow::Result<RemotesConfig>;
 }
-pub struct RealGitsConfig {
-    // pub host: String,
-    // groups_path: PathBuf,
-}
+pub struct RealGitsConfig {}
 
 #[derive(Deserialize, Serialize, Debug)]
 pub struct RemotesConfig {
     pub remotes: HashMap<Host, RemoteSettings>,
 }
 
-
 impl GitsConfig for RealGitsConfig {
     fn build() -> Self {
-        // let remotes_config: RemotesConfig =  <RealGitsConfig as GitsConfig>::load_settings_config().unwrap();
-
-        // let host = remotes_config.remotes.keys().next().expect("it to work"); // defaulting to one host
-        // let groups_path = dirs::home_dir()
-        //     .unwrap()
-        //     .join(format!(".config/gits/{}-watched.toml", host));
-
-        RealGitsConfig {
-            // host: host.clone(),
-            // groups_path,
-        }
+        RealGitsConfig {}
     }
 
     fn get_remotes_config(&self) -> anyhow::Result<RemotesConfig> {
@@ -103,17 +83,18 @@ impl GitsConfig for RealGitsConfig {
                     .join(format!(".config/gits/{}.toml", host));
 
                 if !inventory_path.exists() {
-                    anyhow::bail!(
-                        "No inventory file found at {}.",
-                        inventory_path.display()
-                    );
+                    anyhow::bail!("No inventory file found at {}.", inventory_path.display());
                 }
-                
-                let raw = fs::read_to_string(&inventory_path)
-                    .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", inventory_path.display(), e))?;
 
-                let inventory  = toml::from_str::<InventoryToml>(&raw)
-                    .map_err(|e| anyhow::anyhow!("Failed to parse {}: {}", inventory_path.display(), e))?.groups;
+                let raw = fs::read_to_string(&inventory_path).map_err(|e| {
+                    anyhow::anyhow!("Failed to read {}: {}", inventory_path.display(), e)
+                })?;
+
+                let inventory = toml::from_str::<InventoryToml>(&raw)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to parse {}: {}", inventory_path.display(), e)
+                    })?
+                    .groups;
 
                 Ok((host.clone(), inventory))
             })
@@ -170,7 +151,6 @@ impl GitsConfig for RealGitsConfig {
             .clone()
     }
 
-    
     fn add_to_inventory(&self, git_repo: &GitRepo) -> Result<()> {
         let path = inventory_path_for(&git_repo.host);
 
@@ -208,73 +188,11 @@ impl GitsConfig for RealGitsConfig {
                 .context("writing temp file")?;
             f.flush().ok();
         }
-        fs::rename(&tmp, &path).with_context(|| {
-            format!("renaming {} -> {}", tmp.display(), path.display())
-        })?;
+        fs::rename(&tmp, &path)
+            .with_context(|| format!("renaming {} -> {}", tmp.display(), path.display()))?;
 
         Ok(())
-        
-        
-        
-        // let inventory_path = dirs::home_dir()
-        //     .unwrap()
-        //     .join(format!(".config/gits/{}.toml", git_repo.host));
-        // let mut inventory: Value = toml::from_str(
-        //     &fs::read_to_string(&inventory_path).unwrap_or_else(|_| "[groups]\n".to_string()),
-        // )
-        // .expect("Failed to parse config file");
-        // 
-        // if let Some(groups) = inventory.get_mut("groups") {
-        //     if let Some(table) = groups.as_table_mut() {
-        //         let slug = &git_repo.slug;
-        //         let project = &git_repo.repo_name;
-        //         table.entry(slug).or_insert(Value::Array(vec![]));
-        //         table
-        //             .get_mut(slug)
-        //             .expect("we just put it there")
-        //             .as_array_mut()
-        //             .expect("we put an array")
-        //             .push(Value::String(project.to_string()));
-        //         
-        //         table
-        //             .get_mut(slug)
-        //             .expect("we just put it there")
-        //             .as_array_mut()
-        //             .unwrap()
-        //             .sort_by(|a, b| {
-        //                 match (a, b) {
-        //                     (Value::String(sa), Value::String(sb)) => sa.cmp(sb),
-        //                     _ => std::cmp::Ordering::Equal, // or handle other variants
-        //                 }
-        //             });
-        //         table
-        //             .get_mut(slug)
-        //             .expect("we just put it there")
-        //             .as_array_mut()
-        //             .unwrap()
-        //             .dedup();
-        //         
-        //     } else {
-        //         eprintln!("Error mut toml inventory",);
-        //     }
-        //     print!("final inventory: {:?}", &inventory);
-        // }
-
-        // let mut file = OpenOptions::new()
-        //     .write(true)
-        //     .create(true)
-        //     .truncate(true)
-        //     .open(&inventory_path)
-        //     .expect("Failed to open config file");
-        // 
-        // file.write_all(
-        //     toml::to_string(&inventory)
-        //         .expect("Failed to serialize config")
-        //         .as_bytes(),
-        // )
-        // .expect("Failed to write config file");
     }
-    
 }
 
 fn inventory_path_for(host: &str) -> PathBuf {

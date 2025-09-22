@@ -1,6 +1,5 @@
 use crate::config::{GitsConfig, RealGitsConfig};
-use crate::dolly::{parse_url, GitRepo};
-use crate::git::{Git, RealGit};
+use crate::git::{parse_url, Git, GitRepo, RealGit};
 use anyhow::{anyhow, bail, Context, Result};
 use skim::options::SkimOptionsBuilder;
 use skim::prelude::*;
@@ -23,8 +22,6 @@ impl SkimItem for ProjectOptions {
     }
 }
 fn pick_repo(out: SkimOutput) -> anyhow::Result<GitRepo> {
-    
-    
     let item = out
         .selected_items
         .first()
@@ -71,13 +68,15 @@ pub fn view_projects(git: &RealGit, config: &RealGitsConfig) {
         // 4) Run skim and read selection
         let out = Skim::run_with(&options, Some(rx));
         // let command = Skim::run_with(&options, Some(rx));
-        let out = out.ok_or_else(|| anyhow::anyhow!("No skim output (user aborted?)")).unwrap();
+        let out = out
+            .ok_or_else(|| anyhow::anyhow!("No skim output (user aborted?)"))
+            .unwrap();
         if out.is_abort {
             println!("received escape code. exiting");
             std::process::exit(0);
         }
-        let repo: anyhow::Result<GitRepo>  = pick_repo(out);
-        
+        let repo: anyhow::Result<GitRepo> = pick_repo(out);
+
         let repo = match repo {
             Ok(r) => r,
             Err(_) => {
@@ -109,11 +108,10 @@ pub fn view_projects(git: &RealGit, config: &RealGitsConfig) {
 fn run_repo_actions() -> Result<String> {
     // 1) Build a small command palette
     let options = SkimOptionsBuilder::default()
-        .prompt("Action > ".to_string()) 
+        .prompt("Action > ".to_string())
         .height("40%".to_string())
         .multi(false)
         .build()?;
-    
 
     let (tx, rx): (SkimItemSender, SkimItemReceiver) = unbounded();
     for label in ["Remote", "Clone"] {
@@ -131,12 +129,11 @@ fn run_repo_actions() -> Result<String> {
         .selected_items
         .first()
         .ok_or_else(|| anyhow::anyhow!("No item selected"))?;
-    
+
     if out.is_abort {
-       return Err(anyhow::anyhow!("No item selected"))
+        return Err(anyhow::anyhow!("No item selected"));
     }
-    
-    
+
     let s = item.output();
 
     Ok(s.to_string())

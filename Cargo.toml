@@ -13,12 +13,8 @@ toml = "0.8.20"
 regex = "1.11.1"
 skim = "0.16.0"
 chrono = "0.4"
-rouille = "3.6.2"
 anyhow = "1.0.100"
-[[bin]]
-name = "gitlab_mock_server"
-test = false
-bench = false
+
 [dev-dependencies]
 
 
