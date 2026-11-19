@@ -9,15 +9,15 @@ import (
 	"slices"
 	"strings"
 
-	fzf "github.com/junegunn/fzf/src"
-
 	"github.com/kadinvanvalin/git-sync/internal/config"
 	"github.com/kadinvanvalin/git-sync/internal/git"
+	"github.com/kadinvanvalin/git-sync/internal/picker"
 )
 
 const (
 	actionRemote = "Remote"
 	actionClone  = "Clone"
+	actionWatch  = "Watch"
 )
 
 func ViewProjects(g *git.Git, cfg config.Config) error {
@@ -27,7 +27,7 @@ func ViewProjects(g *git.Git, cfg config.Config) error {
 			return err
 		}
 
-		selected, ok, err := pick("Select an option > ", "50%", projectLines(inventories))
+		selected, ok, err := picker.Pick("Select an option > ", "50%", projectLines(inventories), false)
 		if err != nil {
 			return err
 		}
@@ -35,12 +35,12 @@ func ViewProjects(g *git.Git, cfg config.Config) error {
 			fmt.Println("received escape code. exiting")
 			return nil
 		}
-		repo, err := parseLine(selected)
+		repo, err := parseLine(selected[0])
 		if err != nil {
 			return err
 		}
 
-		action, ok, err := pick("Action > ", "40%", []string{actionRemote, actionClone})
+		actions, ok, err := picker.Pick("Action > ", "40%", []string{actionRemote, actionClone, actionWatch}, false)
 		if err != nil {
 			return err
 		}
@@ -48,7 +48,7 @@ func ViewProjects(g *git.Git, cfg config.Config) error {
 			continue
 		}
 
-		switch action {
+		switch actions[0] {
 		case actionRemote:
 			url := git.WebURL(repo)
 			if err := openURL(url); err != nil {
@@ -62,6 +62,17 @@ func ViewProjects(g *git.Git, cfg config.Config) error {
 			}
 			if err := cfg.AddToInventory(repo); err != nil {
 				return err
+			}
+		case actionWatch:
+			target := config.WatchTarget{Host: repo.Host, Kind: config.WatchProject, Path: repo.Slug + "/" + repo.RepoName}
+			added, err := cfg.Watch(target)
+			if err != nil {
+				return err
+			}
+			if added {
+				fmt.Printf("watching %s\n", target)
+			} else {
+				fmt.Printf("already watching %s\n", target)
 			}
 		}
 	}
@@ -86,35 +97,6 @@ func parseLine(line string) (git.GitRepo, error) {
 		return git.GitRepo{}, fmt.Errorf("invalid selection: %s", line)
 	}
 	return git.ParseURL(fmt.Sprintf("git@%s:%s.git", host, repoPart))
-}
-
-// pick returns false when the user aborts or accepts without a match.
-func pick(prompt, height string, items []string) (string, bool, error) {
-	options, err := fzf.ParseOptions(false, []string{"--prompt=" + prompt, "--height=" + height})
-	if err != nil {
-		return "", false, err
-	}
-
-	input := make(chan string, len(items))
-	for _, item := range items {
-		input <- item
-	}
-	close(input)
-	output := make(chan string, 1)
-	options.Input = input
-	options.Output = output
-
-	code, err := fzf.Run(options)
-	switch code {
-	case fzf.ExitOk:
-		return <-output, true, nil
-	case fzf.ExitNoMatch, fzf.ExitInterrupt:
-		return "", false, nil
-	}
-	if err == nil {
-		err = fmt.Errorf("fzf exited with code %d", code)
-	}
-	return "", false, err
 }
 
 func openURL(url string) error {

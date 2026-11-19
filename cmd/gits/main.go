@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/kadinvanvalin/git-sync/internal/github"
 	"github.com/kadinvanvalin/git-sync/internal/gitlab"
 	"github.com/kadinvanvalin/git-sync/internal/list"
+	"github.com/kadinvanvalin/git-sync/internal/picker"
 )
 
 const longDescription = "git-sync keeps lots of Git repos up to date with one command. " +
@@ -155,6 +157,124 @@ func (a *app) list([]string) error {
 	return list.ViewProjects(a.git, a.config)
 }
 
+func (a *app) watchAdd(args []string) error {
+	var targets []config.WatchTarget
+	if len(args) == 0 {
+		candidates, err := a.config.WatchCandidates()
+		if err != nil {
+			return err
+		}
+		picked, err := pickTargets("Watch (tab for multiple) > ", candidates)
+		if err != nil {
+			return err
+		}
+		targets = picked
+	}
+	for _, arg := range args {
+		target, matches, err := a.config.ResolveWatchTarget(arg)
+		if err != nil {
+			return err
+		}
+		if matches == 0 {
+			fmt.Printf("note: nothing in the %s inventory matches %s yet, run `gits sync` to fetch it\n", target.Host, target.Path)
+		}
+		targets = append(targets, target)
+	}
+
+	for _, target := range targets {
+		if a.dryrun {
+			fmt.Printf("would watch %s\n", target)
+			continue
+		}
+		added, err := a.config.Watch(target)
+		if err != nil {
+			return err
+		}
+		if added {
+			fmt.Printf("watching %s\n", target)
+		} else {
+			fmt.Printf("already watching %s\n", target)
+		}
+	}
+	if len(targets) > 0 && !a.dryrun {
+		fmt.Println("run `gits sync-watched` to clone them")
+	}
+	return nil
+}
+
+func (a *app) watchRemove(args []string) error {
+	watched, err := a.config.WatchTargets()
+	if err != nil {
+		return err
+	}
+	var targets []config.WatchTarget
+	if len(args) == 0 {
+		if len(watched) == 0 {
+			fmt.Println("nothing is being watched")
+			return nil
+		}
+		picked, err := pickTargets("Unwatch (tab for multiple) > ", watched)
+		if err != nil {
+			return err
+		}
+		targets = picked
+	}
+	for _, arg := range args {
+		arg = strings.Trim(strings.Replace(arg, " ", "/", 1), "/")
+		i := slices.IndexFunc(watched, func(t config.WatchTarget) bool { return t.Host+"/"+t.Path == arg })
+		if i < 0 {
+			return fmt.Errorf("%s is not being watched, see `gits watch list`", arg)
+		}
+		targets = append(targets, watched[i])
+	}
+
+	for _, target := range targets {
+		if a.dryrun {
+			fmt.Printf("would stop watching %s\n", target)
+			continue
+		}
+		if _, err := a.config.Unwatch(target); err != nil {
+			return err
+		}
+		// the clone on disk is left alone
+		fmt.Printf("stopped watching %s\n", target)
+	}
+	return nil
+}
+
+func (a *app) watchList([]string) error {
+	watched, err := a.config.WatchTargets()
+	if err != nil {
+		return err
+	}
+	if len(watched) == 0 {
+		fmt.Println("nothing is being watched, add something with `gits watch add`")
+	}
+	for _, target := range watched {
+		fmt.Println(target)
+	}
+	return nil
+}
+
+// pickTargets returns no targets, not an error, when the user escapes.
+func pickTargets(prompt string, targets []config.WatchTarget) ([]config.WatchTarget, error) {
+	byLine := make(map[string]config.WatchTarget, len(targets))
+	lines := make([]string, 0, len(targets))
+	for _, target := range targets {
+		byLine[target.String()] = target
+		lines = append(lines, target.String())
+	}
+	selected, ok, err := picker.Pick(prompt, "50%", lines, true)
+	if err != nil || !ok {
+		return nil, err
+	}
+	picked := make([]config.WatchTarget, 0, len(selected))
+	for _, line := range selected {
+		picked = append(picked, byLine[line])
+	}
+	return picked, nil
+}
+
 func (a *app) rootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:              "gits",
@@ -175,7 +295,18 @@ func (a *app) rootCommand() *cobra.Command {
 	// everything after the first word is part of the commit message
 	commit.Flags().SetInterspersed(false)
 
+	watch := &cobra.Command{
+		Use:   "watch",
+		Short: "add or remove projects and groups from the watched set that sync-watched clones",
+	}
+	watch.AddCommand(
+		a.command("add [host/path]...", "watch projects or groups, pick from the inventory when none are given", cobra.ArbitraryArgs, a.watchAdd),
+		a.command("remove [host/path]...", "stop watching projects or groups, pick from the watched set when none are given", cobra.ArbitraryArgs, a.watchRemove),
+		a.command("list", "show what is being watched", cobra.NoArgs, a.watchList),
+	)
+
 	root.AddCommand(
+		watch,
 		a.command("status", "true status - git fetch and status", cobra.NoArgs, a.status),
 		commit,
 		a.command("remote", "opens the repo in browser", cobra.NoArgs, a.remote),

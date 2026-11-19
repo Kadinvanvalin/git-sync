@@ -46,6 +46,14 @@ func configDir() (string, error) {
 	return filepath.Join(home, ".config", "gits"), nil
 }
 
+func configFilePath() (string, error) {
+	dir, err := configDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(dir, "config.toml"), nil
+}
+
 func inventoryPathFor(host string) (string, error) {
 	dir, err := configDir()
 	if err != nil {
@@ -56,11 +64,10 @@ func inventoryPathFor(host string) (string, error) {
 
 func (Config) Remotes() (RemotesConfig, error) {
 	var config RemotesConfig
-	dir, err := configDir()
+	configPath, err := configFilePath()
 	if err != nil {
 		return config, err
 	}
-	configPath := filepath.Join(dir, "config.toml")
 
 	raw, err := os.ReadFile(configPath)
 	if errors.Is(err, fs.ErrNotExist) {
@@ -105,24 +112,34 @@ func (c Config) Inventory() (map[string]InventoryGroups, error) {
 
 	inventories := make(map[string]InventoryGroups, len(remotes.Remotes))
 	for host := range remotes.Remotes {
-		path, err := inventoryPathFor(host)
+		groups, err := readInventory(host)
 		if err != nil {
 			return nil, err
 		}
-		raw, err := os.ReadFile(path)
-		if errors.Is(err, fs.ErrNotExist) {
-			return nil, fmt.Errorf("No inventory file found at %s.", path)
-		}
-		if err != nil {
-			return nil, fmt.Errorf("failed to read %s: %w", path, err)
-		}
-		var inventory inventoryToml
-		if _, err := toml.Decode(string(raw), &inventory); err != nil {
-			return nil, fmt.Errorf("failed to parse %s: %w", path, err)
-		}
-		inventories[host] = inventory.Groups
+		inventories[host] = groups
 	}
 	return inventories, nil
+}
+
+// readInventory returns an error wrapping fs.ErrNotExist when the host has
+// not been synced yet.
+func readInventory(host string) (InventoryGroups, error) {
+	path, err := inventoryPathFor(host)
+	if err != nil {
+		return nil, err
+	}
+	raw, err := os.ReadFile(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("No inventory file found at %s: %w", path, err)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to read %s: %w", path, err)
+	}
+	var inventory inventoryToml
+	if _, err := toml.Decode(string(raw), &inventory); err != nil {
+		return nil, fmt.Errorf("failed to parse %s: %w", path, err)
+	}
+	return inventory.Groups, nil
 }
 
 func (c Config) Repos() ([]git.GitRepo, error) {
@@ -210,9 +227,12 @@ func (Config) AddToInventory(repo git.GitRepo) error {
 		return fmt.Errorf("serializing inventory: %w", err)
 	}
 
-	// Atomic write
+	return writeAtomic(path, serialized.Bytes())
+}
+
+func writeAtomic(path string, data []byte) error {
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, serialized.Bytes(), 0o644); err != nil {
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		return fmt.Errorf("writing temp file %s: %w", tmp, err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
