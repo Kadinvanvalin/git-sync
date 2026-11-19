@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 
@@ -139,6 +140,41 @@ func (c Config) Repos() ([]git.GitRepo, error) {
 		}
 	}
 	return repos, nil
+}
+
+// WatchedRepos returns the inventory repos matching their remote's
+// watch_groups (slug, including subgroups) or watch_projects (slug/name).
+func (c Config) WatchedRepos() ([]git.GitRepo, error) {
+	remotes, err := c.Remotes()
+	if err != nil {
+		return nil, err
+	}
+	repos, err := c.Repos()
+	if err != nil {
+		return nil, err
+	}
+
+	var watched []git.GitRepo
+	for _, repo := range repos {
+		settings := remotes.Remotes[repo.Host]
+		if isWatched(repo, settings) {
+			watched = append(watched, repo)
+		}
+	}
+	return watched, nil
+}
+
+func isWatched(repo git.GitRepo, settings git.RemoteSettings) bool {
+	if slices.Contains(settings.WatchProjects, repo.Slug+"/"+repo.RepoName) {
+		return true
+	}
+	for _, group := range settings.WatchGroups {
+		group = strings.Trim(group, "/")
+		if repo.Slug == group || strings.HasPrefix(repo.Slug, group+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func (Config) AddToInventory(repo git.GitRepo) error {

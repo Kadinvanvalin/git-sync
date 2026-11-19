@@ -88,7 +88,7 @@ func (a *app) syncWatched([]string) error {
 	if err != nil {
 		return err
 	}
-	repos, err := a.config.Repos()
+	repos, err := a.config.WatchedRepos()
 	if err != nil {
 		return err
 	}
