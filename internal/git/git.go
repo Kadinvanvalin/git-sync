@@ -178,3 +178,26 @@ func ProjectsToRepos(projects []Project) ([]GitRepo, error) {
 	}
 	return repos, nil
 }
+
+// UnsavedWork describes work in the clone at dir that only exists locally,
+// or returns "" when there is none.
+func (g *Git) UnsavedWork(dir string) (string, error) {
+	checks := []struct {
+		reason string
+		args   []string
+	}{
+		{"uncommitted changes", []string{"status", "--porcelain"}},
+		{"commits not pushed to any remote", []string{"log", "--branches", "--not", "--remotes", "--oneline"}},
+		{"stashed changes", []string{"stash", "list"}},
+	}
+	for _, check := range checks {
+		out, err := g.executor.Run("git", append([]string{"-C", dir}, check.args...)...)
+		if err != nil {
+			return "", err
+		}
+		if strings.TrimSpace(out) != "" {
+			return check.reason, nil
+		}
+	}
+	return "", nil
+}

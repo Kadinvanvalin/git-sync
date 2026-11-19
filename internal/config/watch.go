@@ -68,7 +68,7 @@ func (c Config) ResolveWatchTarget(arg string) (target WatchTarget, matches int,
 			if slug+"/"+project == target.Path {
 				return WatchTarget{Host: target.Host, Kind: WatchProject, Path: target.Path}, 1, nil
 			}
-			if isWatched(repo, settings) {
+			if IsWatched(repo, settings) {
 				matches++
 			}
 		}
@@ -181,7 +181,7 @@ func (c Config) WatchCandidates() ([]WatchTarget, error) {
 			for i := range parts {
 				group := strings.Join(parts[:i+1], "/")
 				// a group is covered when it, or a parent, is watched
-				covered := isWatched(git.GitRepo{Host: host, Slug: group}, settings)
+				covered := IsWatched(git.GitRepo{Host: host, Slug: group}, settings)
 				if !seen[group] && !covered {
 					groups = append(groups, WatchTarget{Host: host, Kind: WatchGroup, Path: group})
 				}
@@ -189,7 +189,7 @@ func (c Config) WatchCandidates() ([]WatchTarget, error) {
 			}
 			for _, project := range inventories[host][slug] {
 				repo := git.GitRepo{Host: host, Slug: slug, RepoName: project}
-				if !isWatched(repo, settings) {
+				if !IsWatched(repo, settings) {
 					projects = append(projects, WatchTarget{Host: host, Kind: WatchProject, Path: slug + "/" + project})
 				}
 			}

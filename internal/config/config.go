@@ -174,14 +174,16 @@ func (c Config) WatchedRepos() ([]git.GitRepo, error) {
 	var watched []git.GitRepo
 	for _, repo := range repos {
 		settings := remotes.Remotes[repo.Host]
-		if isWatched(repo, settings) {
+		if IsWatched(repo, settings) {
 			watched = append(watched, repo)
 		}
 	}
 	return watched, nil
 }
 
-func isWatched(repo git.GitRepo, settings git.RemoteSettings) bool {
+// IsWatched reports whether the repo matches the remote's watch_groups
+// (slug, including subgroups) or watch_projects (slug/name).
+func IsWatched(repo git.GitRepo, settings git.RemoteSettings) bool {
 	if slices.Contains(settings.WatchProjects, repo.Slug+"/"+repo.RepoName) {
 		return true
 	}

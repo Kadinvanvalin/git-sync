@@ -1,8 +1,11 @@
 package main
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"slices"
@@ -30,6 +33,7 @@ const longDescription = "git-sync keeps lots of Git repos up to date with one co
 
 type app struct {
 	dryrun  bool
+	yes     bool
 	output  bool
 	started bool
 	git     *git.Git
@@ -236,8 +240,10 @@ func (a *app) watchRemove(args []string) error {
 		if _, err := a.config.Unwatch(target); err != nil {
 			return err
 		}
-		// the clone on disk is left alone
 		fmt.Printf("stopped watching %s\n", target)
+	}
+	if len(targets) > 0 && !a.dryrun {
+		fmt.Println("clones are left on disk, run `gits prune` to delete them")
 	}
 	return nil
 }
@@ -275,6 +281,114 @@ func pickTargets(prompt string, targets []config.WatchTarget) ([]config.WatchTar
 	return picked, nil
 }
 
+func (a *app) prune([]string) error {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	remotes, err := a.config.Remotes()
+	if err != nil {
+		return err
+	}
+	// the safety checks only read, so they run for real even in dryrun
+	checker := git.New(executor.Real{})
+
+	var doomed []string
+	for _, host := range slices.Sorted(maps.Keys(remotes.Remotes)) {
+		settings := remotes.Remotes[host]
+		clones, err := findClones(filepath.Join(home, host))
+		if err != nil {
+			return err
+		}
+		for _, rel := range clones {
+			repo := git.GitRepo{Host: host, Slug: filepath.Dir(rel), RepoName: filepath.Base(rel)}
+			if config.IsWatched(repo, settings) {
+				continue
+			}
+			dir := filepath.Join(home, host, rel)
+			reason, err := checker.UnsavedWork(dir)
+			if err != nil {
+				fmt.Printf("keeping %s: could not check it: %v\n", dir, err)
+				continue
+			}
+			if reason != "" {
+				fmt.Printf("keeping %s: %s\n", dir, reason)
+				continue
+			}
+			doomed = append(doomed, dir)
+		}
+	}
+
+	if len(doomed) == 0 {
+		fmt.Println("nothing to prune")
+		return nil
+	}
+	fmt.Println("not watched and safe to delete:")
+	for _, dir := range doomed {
+		fmt.Printf("  %s\n", dir)
+	}
+	if a.dryrun {
+		fmt.Printf("would delete %d repos\n", len(doomed))
+		return nil
+	}
+	if !a.yes && !confirm(fmt.Sprintf("delete %d repos? [y/N] ", len(doomed))) {
+		fmt.Println("nothing deleted")
+		return nil
+	}
+	for _, dir := range doomed {
+		if err := os.RemoveAll(dir); err != nil {
+			return err
+		}
+		removeEmptyParents(filepath.Dir(dir), home)
+		fmt.Printf("deleted %s\n", dir)
+	}
+	return nil
+}
+
+// findClones returns the paths, relative to root, of every git repo under it.
+func findClones(root string) ([]string, error) {
+	var clones []string
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if errors.Is(err, fs.ErrNotExist) && path == root {
+			return fs.SkipAll
+		}
+		if err != nil {
+			return err
+		}
+		if !d.IsDir() || path == root {
+			return nil
+		}
+		if info, err := os.Stat(filepath.Join(path, ".git")); err == nil && info.IsDir() {
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			clones = append(clones, rel)
+			return filepath.SkipDir
+		}
+		return nil
+	})
+	return clones, err
+}
+
+// removeEmptyParents removes dir and its parents while they are empty,
+// stopping at the host directory under home.
+func removeEmptyParents(dir, home string) {
+	for filepath.Dir(dir) != home && dir != home {
+		if os.Remove(dir) != nil {
+			return
+		}
+		dir = filepath.Dir(dir)
+	}
+}
+
+func confirm(prompt string) bool {
+	fmt.Print(prompt)
+	answer, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+	answer = strings.ToLower(strings.TrimSpace(answer))
+	return answer == "y" || answer == "yes"
+}
+
 func (a *app) rootCommand() *cobra.Command {
 	root := &cobra.Command{
 		Use:              "gits",
@@ -305,8 +419,12 @@ func (a *app) rootCommand() *cobra.Command {
 		a.command("list", "show what is being watched", cobra.NoArgs, a.watchList),
 	)
 
+	prune := a.command("prune", "delete clones that are no longer watched, skipping any with local-only work", cobra.NoArgs, a.prune)
+	prune.Flags().BoolVarP(&a.yes, "yes", "y", false, "delete without asking")
+
 	root.AddCommand(
 		watch,
+		prune,
 		a.command("status", "true status - git fetch and status", cobra.NoArgs, a.status),
 		commit,
 		a.command("remote", "opens the repo in browser", cobra.NoArgs, a.remote),
