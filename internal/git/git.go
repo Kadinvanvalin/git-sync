@@ -61,6 +61,24 @@ func New(executor executor.CommandExecutor) *Git {
 	return &Git{executor: executor}
 }
 
+// ClonePath is where CloneRepo puts the repo: ~/host/slug/name.
+func ClonePath(repo GitRepo) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, repo.Host, repo.Slug, repo.RepoName), nil
+}
+
+func IsCloned(repo GitRepo) bool {
+	path, err := ClonePath(repo)
+	if err != nil {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(path, ".git"))
+	return err == nil && info.IsDir()
+}
+
 func (g *Git) CloneRepo(repo GitRepo) error {
 	home, err := os.UserHomeDir()
 	if err != nil {

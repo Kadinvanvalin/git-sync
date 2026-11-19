@@ -160,40 +160,119 @@ func editWatchList(target WatchTarget, edit func([]string) ([]string, bool)) (bo
 	return true, writeAtomic(path, serialized.Bytes())
 }
 
-// WatchCandidates lists the inventory's groups (including parent groups) and
-// projects that are not already watched, groups first.
-func (c Config) WatchCandidates() ([]WatchTarget, error) {
+type WatchStatus int
+
+const (
+	// ordered by how useful the entry is to act on in the selector
+	StatusDownloaded WatchStatus = iota
+	StatusNotWatched
+	StatusWatched
+	StatusWatchedByGroup
+)
+
+type WatchEntry struct {
+	WatchTarget
+	Status WatchStatus
+	// for groups, how many of the projects under it are cloned
+	Cloned, Total int
+}
+
+// WatchEntries lists every synced group (including parent groups) and project
+// with its watch status, plus watch list entries the inventory does not have
+// yet. Hosts that have not been synced are skipped.
+func (c Config) WatchEntries() ([]WatchEntry, error) {
 	remotes, err := c.Remotes()
 	if err != nil {
 		return nil, err
 	}
-	inventories, err := c.Inventory()
-	if err != nil {
-		return nil, fmt.Errorf("%w\nrun `gits sync` first to fetch the list of projects", err)
-	}
 
-	var groups, projects []WatchTarget
-	for _, host := range slices.Sorted(maps.Keys(inventories)) {
+	var entries []WatchEntry
+	for _, host := range slices.Sorted(maps.Keys(remotes.Remotes)) {
 		settings := remotes.Remotes[host]
-		seen := map[string]bool{}
-		for _, slug := range slices.Sorted(maps.Keys(inventories[host])) {
+		inventory, err := readInventory(host)
+		if errors.Is(err, fs.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		groups := map[string]*WatchEntry{}
+		for _, slug := range slices.Sorted(maps.Keys(inventory)) {
 			parts := strings.Split(slug, "/")
+			var parents []*WatchEntry
 			for i := range parts {
-				group := strings.Join(parts[:i+1], "/")
-				// a group is covered when it, or a parent, is watched
-				covered := IsWatched(git.GitRepo{Host: host, Slug: group}, settings)
-				if !seen[group] && !covered {
-					groups = append(groups, WatchTarget{Host: host, Kind: WatchGroup, Path: group})
+				path := strings.Join(parts[:i+1], "/")
+				if groups[path] == nil {
+					groups[path] = &WatchEntry{
+						WatchTarget: WatchTarget{Host: host, Kind: WatchGroup, Path: path},
+						Status:      groupStatus(path, settings),
+					}
 				}
-				seen[group] = true
+				parents = append(parents, groups[path])
 			}
-			for _, project := range inventories[host][slug] {
+			for _, project := range inventory[slug] {
 				repo := git.GitRepo{Host: host, Slug: slug, RepoName: project}
-				if !IsWatched(repo, settings) {
-					projects = append(projects, WatchTarget{Host: host, Kind: WatchProject, Path: slug + "/" + project})
+				cloned := git.IsCloned(repo)
+				for _, group := range parents {
+					group.Total++
+					if cloned {
+						group.Cloned++
+					}
 				}
+				entries = append(entries, WatchEntry{
+					WatchTarget: WatchTarget{Host: host, Kind: WatchProject, Path: slug + "/" + project},
+					Status:      projectStatus(repo, settings, cloned),
+				})
 			}
 		}
+		for _, group := range groups {
+			if group.Status == StatusNotWatched && group.Cloned > 0 {
+				group.Status = StatusDownloaded
+			}
+			entries = append(entries, *group)
+		}
 	}
-	return append(groups, projects...), nil
+
+	// keep watch list entries that are not synced yet, so they can be removed
+	targets, err := c.WatchTargets()
+	if err != nil {
+		return nil, err
+	}
+	for _, target := range targets {
+		target.Path = strings.Trim(target.Path, "/")
+		if !slices.ContainsFunc(entries, func(e WatchEntry) bool { return e.WatchTarget == target }) {
+			entries = append(entries, WatchEntry{WatchTarget: target, Status: StatusWatched})
+		}
+	}
+
+	slices.SortFunc(entries, func(a, b WatchEntry) int {
+		if a.Status != b.Status {
+			return int(a.Status) - int(b.Status)
+		}
+		return strings.Compare(a.Host+"/"+a.Path, b.Host+"/"+b.Path)
+	})
+	return entries, nil
+}
+
+func groupStatus(path string, settings git.RemoteSettings) WatchStatus {
+	if slices.ContainsFunc(settings.WatchGroups, func(g string) bool { return strings.Trim(g, "/") == path }) {
+		return StatusWatched
+	}
+	if IsWatched(git.GitRepo{Slug: path}, settings) {
+		return StatusWatchedByGroup
+	}
+	return StatusNotWatched
+}
+
+func projectStatus(repo git.GitRepo, settings git.RemoteSettings, cloned bool) WatchStatus {
+	switch {
+	case slices.Contains(settings.WatchProjects, repo.Slug+"/"+repo.RepoName):
+		return StatusWatched
+	case IsWatched(repo, settings):
+		return StatusWatchedByGroup
+	case cloned:
+		return StatusDownloaded
+	}
+	return StatusNotWatched
 }

@@ -8,9 +8,9 @@ import (
 
 // Pick runs fzf over items and returns the selected lines. It returns false
 // when the user aborts or accepts without a match. With multi, tab selects
-// several lines.
-func Pick(prompt, height string, items []string, multi bool) ([]string, bool, error) {
-	args := []string{"--prompt=" + prompt, "--height=" + height}
+// several lines. extra is passed to fzf as options.
+func Pick(prompt, height string, items []string, multi bool, extra ...string) ([]string, bool, error) {
+	args := append([]string{"--prompt=" + prompt, "--height=" + height}, extra...)
 	if multi {
 		args = append(args, "--multi")
 	}

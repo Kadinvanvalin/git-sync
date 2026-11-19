@@ -90,18 +90,13 @@ func (a *app) remote([]string) error {
 }
 
 func (a *app) syncWatched([]string) error {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return err
-	}
 	repos, err := a.config.WatchedRepos()
 	if err != nil {
 		return err
 	}
 	for _, repo := range repos {
 		// maybe check if dir exists and delete if not a repo? idk
-		info, err := os.Stat(filepath.Join(home, repo.Host, repo.Slug, repo.RepoName, ".git"))
-		if err == nil && info.IsDir() {
+		if git.IsCloned(repo) {
 			continue
 		}
 		fmt.Printf("cloning %+v\n", repo)
@@ -163,17 +158,6 @@ func (a *app) list([]string) error {
 
 func (a *app) watchAdd(args []string) error {
 	var targets []config.WatchTarget
-	if len(args) == 0 {
-		candidates, err := a.config.WatchCandidates()
-		if err != nil {
-			return err
-		}
-		picked, err := pickTargets("Watch (tab for multiple) > ", candidates)
-		if err != nil {
-			return err
-		}
-		targets = picked
-	}
 	for _, arg := range args {
 		target, matches, err := a.config.ResolveWatchTarget(arg)
 		if err != nil {
@@ -212,17 +196,6 @@ func (a *app) watchRemove(args []string) error {
 		return err
 	}
 	var targets []config.WatchTarget
-	if len(args) == 0 {
-		if len(watched) == 0 {
-			fmt.Println("nothing is being watched")
-			return nil
-		}
-		picked, err := pickTargets("Unwatch (tab for multiple) > ", watched)
-		if err != nil {
-			return err
-		}
-		targets = picked
-	}
 	for _, arg := range args {
 		arg = strings.Trim(strings.Replace(arg, " ", "/", 1), "/")
 		i := slices.IndexFunc(watched, func(t config.WatchTarget) bool { return t.Host+"/"+t.Path == arg })
@@ -254,7 +227,7 @@ func (a *app) watchList([]string) error {
 		return err
 	}
 	if len(watched) == 0 {
-		fmt.Println("nothing is being watched, add something with `gits watch add`")
+		fmt.Println("nothing is being watched, run `gits watch` to pick some")
 	}
 	for _, target := range watched {
 		fmt.Println(target)
@@ -262,23 +235,85 @@ func (a *app) watchList([]string) error {
 	return nil
 }
 
-// pickTargets returns no targets, not an error, when the user escapes.
-func pickTargets(prompt string, targets []config.WatchTarget) ([]config.WatchTarget, error) {
-	byLine := make(map[string]config.WatchTarget, len(targets))
-	lines := make([]string, 0, len(targets))
-	for _, target := range targets {
-		byLine[target.String()] = target
-		lines = append(lines, target.String())
+// watchSelect lists everything synced and toggles the watch on what is picked.
+func (a *app) watchSelect([]string) error {
+	entries, err := a.config.WatchEntries()
+	if err != nil {
+		return err
 	}
-	selected, ok, err := picker.Pick(prompt, "50%", lines, true)
+	if len(entries) == 0 {
+		fmt.Println("nothing synced yet, run `gits sync` first")
+		return nil
+	}
+
+	byLine := make(map[string]config.WatchEntry, len(entries))
+	lines := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		line := watchLine(entry)
+		byLine[line] = entry
+		lines = append(lines, line)
+	}
+	header := "tab to select several, enter to toggle watching\n" +
+		"downloaded = cloned but not watched, via group = watched through a parent group"
+	selected, ok, err := picker.Pick("Watch > ", "70%", lines, true, "--header="+header)
 	if err != nil || !ok {
-		return nil, err
+		return err
 	}
-	picked := make([]config.WatchTarget, 0, len(selected))
+
+	changed := false
 	for _, line := range selected {
-		picked = append(picked, byLine[line])
+		entry := byLine[line]
+		switch entry.Status {
+		case config.StatusWatchedByGroup:
+			fmt.Printf("%s is watched through a parent group, unwatch that group instead\n", entry.WatchTarget)
+			continue
+		case config.StatusWatched:
+			if a.dryrun {
+				fmt.Printf("would stop watching %s\n", entry.WatchTarget)
+				continue
+			}
+			if _, err := a.config.Unwatch(entry.WatchTarget); err != nil {
+				return err
+			}
+			fmt.Printf("stopped watching %s\n", entry.WatchTarget)
+		default:
+			if a.dryrun {
+				fmt.Printf("would watch %s\n", entry.WatchTarget)
+				continue
+			}
+			if _, err := a.config.Watch(entry.WatchTarget); err != nil {
+				return err
+			}
+			fmt.Printf("watching %s\n", entry.WatchTarget)
+		}
+		changed = true
 	}
-	return picked, nil
+	if changed {
+		fmt.Println("run `gits sync-watched` to clone new ones, `gits prune` to delete unwatched ones")
+	}
+	return nil
+}
+
+func watchLine(entry config.WatchEntry) string {
+	var status string
+	switch entry.Status {
+	case config.StatusWatched:
+		status = "watched"
+	case config.StatusWatchedByGroup:
+		status = "via group"
+	case config.StatusDownloaded:
+		status = "downloaded"
+	}
+	path := entry.Host + "/" + entry.Path
+	if entry.Kind == config.WatchGroup {
+		path += "/"
+		if entry.Total > 0 {
+			path += fmt.Sprintf("  (group, %d/%d cloned)", entry.Cloned, entry.Total)
+		} else {
+			path += "  (group)"
+		}
+	}
+	return fmt.Sprintf("%-10s  %s", status, path)
 }
 
 func (a *app) prune([]string) error {
@@ -409,13 +444,10 @@ func (a *app) rootCommand() *cobra.Command {
 	// everything after the first word is part of the commit message
 	commit.Flags().SetInterspersed(false)
 
-	watch := &cobra.Command{
-		Use:   "watch",
-		Short: "add or remove projects and groups from the watched set that sync-watched clones",
-	}
+	watch := a.command("watch", "pick projects and groups to watch from everything synced, sync-watched clones them", cobra.NoArgs, a.watchSelect)
 	watch.AddCommand(
-		a.command("add [host/path]...", "watch projects or groups, pick from the inventory when none are given", cobra.ArbitraryArgs, a.watchAdd),
-		a.command("remove [host/path]...", "stop watching projects or groups, pick from the watched set when none are given", cobra.ArbitraryArgs, a.watchRemove),
+		a.command("add host/path...", "watch projects or groups by path", cobra.MinimumNArgs(1), a.watchAdd),
+		a.command("remove host/path...", "stop watching projects or groups by path", cobra.MinimumNArgs(1), a.watchRemove),
 		a.command("list", "show what is being watched", cobra.NoArgs, a.watchList),
 	)
 
