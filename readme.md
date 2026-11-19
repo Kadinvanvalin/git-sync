@@ -13,10 +13,10 @@ It helps you:
 ## Installation
 
 ```bash
-# Clone and build with Cargo
+# Clone and build with Go
 git clone https://github.com/kadinvanvalin/git-sync.git
 cd git-sync
-cargo install --path .
+go install ./cmd/gits
 ````
 Configuration
 

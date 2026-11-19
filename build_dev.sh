@@ -1,3 +1,2 @@
-cargo build 
-cp target/debug/gits ~/.local/bin/gits
+go build -o ~/.local/bin/gits ./cmd/gits
 cp ./wrapper.sh ~/.local/bin/wrapper.sh
